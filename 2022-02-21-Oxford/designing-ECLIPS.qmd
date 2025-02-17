@@ -1,0 +1,115 @@
+---
+title: "Designing the ECLIPS Study"
+author: "Frank DiTraglia, Ludovica Gazze (and friends!)"
+format: 
+  beamer:
+    aspectratio: 169
+---
+
+## What is the ECLIPS Study? 
+
+:::: {.columns}
+
+::: {.column width="70%"}
+
+### Elevated Childhood Lead Interagency Prevalence Study
+- Jane Entwistle, Lindsay Bramwell, *Northumbria*
+- Frank DiTraglia, *Oxford*
+- Ludovica Gazze, *Warwick*
+- Carys Lippiatt, *Leeds Teaching Hospitals*
+- Priya Mondal, Ovnair Sepai, *UKHSA*
+- Jackie Morton, *Health & Safety Executive*
+- Caroline Taylor, *Bristol*
+
+### UKRI Cross Research Countil Responsive Mode Scheme
+
+- Funded from Jan 2025 -- Dec 2027
+- Pilot a home test for childhood lead exposure in Leeds
+- Finger-prick test using Capitainer (at right)
+
+
+:::
+
+::: {.column width="30%"}
+![](../img/capitainer.jpeg)
+:::
+
+::::
+
+## Background on Childhood Lead Exposure 
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+### Lead is a potent neurotoxin
+- Toxic whether inhaled or ingested
+- Most harmful to young children 
+- Harm from even low levels of exposure 
+
+### Didn't we get rid of the lead?
+- Lead paint and pipes in older homes
+- Soil near major roads still contaminated 
+- Industrial pollution, traditional products
+
+### US Policy Landscape
+- EPA regulations for renovation (lead paint)
+- Mandated screening of children on Medicaid 
+- Screening for representative sample: NHANES 
+
+:::
+
+::: {.column width="40%"}
+![](../img/tweet-whitehouse.png)
+:::
+
+::::
+
+## Economists are allowed to write papers about lead exposure. 
+
+### Aizer & Currie (2018; AEJ Applied)
+Lower BLLs explain 75% of decline in school suspensions from 1994-2015 in RI
+
+### Aizer, Currie, Simon & Vivier (2019; ReStat)
+Low levels of lead (BLL $\leq$ 5) have a discernible negative affect on test scores.
+
+### Groenqvist, Nilsson & Robling (2020; JPE)
+Long-term effects on human capital and crime from low doses of lead
+
+### Billings & Schnepel (2018; AEJ Applied)
+Early interventions largely reverse negative effects for lead-exposed children.
+
+### Abbasi, DiTraglia, Gazze & Pals (2023; J. Health Econ.)
+Estimate geographic distribution of undetected lead poisoning in Illinois; evaluate alternative screening policies.
+
+## How did I get involved in this project? 
+
+|![](../img/guardian2022.png){width=135px} |![](../img/guardian2021.png){width=135px}| ![](../img/guardian2020.png){width=135px}|
+
+
+##
+
+![](../img/UK-vs-US-housing-age.png)
+
+## There is no lead screening in the UK whatsoever. 
+
+### 2018 National Screening Committee Report
+
+>The volume, quality, and direction of evidence published since 2012 does not indicate that screening for elevated BLLs should be recommended in the UK. Several uncertainties remain across key criteria including: lack of evidence that elevated BLLs in children is an important health problem in terms of UK prevalence.
+
+
+### 2019 Lead Exposure in Children Surveillance System Report
+
+> There are no recent comprehensive survey data estimating how many children in England are exposed to lead.
+
+### 2021 Public Health England (now HSA)
+Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
+
+
+## Overview of ECLIPS Study 
+
+Give a broad overview here; maybe show the flowcharts?
+
+
+## Randomized Messaging
+
