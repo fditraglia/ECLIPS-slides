@@ -113,13 +113,33 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 ::::
 
 
+## Literature review /motivation about take-up?
+
+Why is take-up / selection into testing interesting from an Econ perspective? This is better than "Economists have worked on lead"
+
+
+- How much blood the device requires: tablespoon? Size of lancet etc.
+- Planned for kids 6 months to 6 years, but 6 months seems less likely now
+- Greenstone et al. take-up of something painful
+- ELSA study? Take-up results?
+- Exposure risk likely correlates (negatively) with income
+- (Maybe something about our)
+- Know that lower-income people are less likely to take up
+- A bit more about how you need to collect 10 microliters (17 total)
+- Maybe a picture with a kid crying and a needle. 
+- Need parents to actually do this!
+- Motivations for participating: information about your kid's health, altruism (help other kids in the UK)
+- But hard to make your kid cooperate? (Joe's anecdote)  
+
+
+
 ## Overview of ECLIPS Study: Phase I
 
 :::: {.columns}
 
 ::: {.column width="35%"}
 
-- Add various points here 
+- What we proposed in the grant: now we're thinking of some changes. 
 
 :::
 
@@ -149,7 +169,7 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 
 ::: {.column width="35%"}
 
-- Add various points here 
+- What we proposed in the grant: now we're thinking of some changes. 
 
 :::
 
@@ -217,5 +237,9 @@ If we have time: interested to hear what it would be interesting to randomize he
 
 ::::
 
+## Randomized Test Kits
 
+- Reward for kids? Hard to find something that is child-safe and appropriate for many ages (choking hazard)
+- Delayed reward / surprise? (Stickers in an envelope versus not)
+- Other ideas?
 
