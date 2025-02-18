@@ -181,6 +181,24 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 
 ## What we'd like feedback on today
 
+### Randomized Outreach Messages
+Test effect of different outreach messages on participation; what's interesting here?
+
+ 
+### Sampling Plan
+Two-stage, adaptive, stratified sampling plan. Comments / concerns?
+
+### Randomized Test Kits
+If we have time: interested to hear what it would be interesting to randomize here.
+
+
+## Randomized Messaging
+
+### Two Questions for our Expert Audience
+
+1. Which comparison is most interesting from a research perspective?
+2. What to pick as a baseline / control from among the less interesting questions? 
+
 ## Stratified Sampling
 
 :::: {.columns}
@@ -199,8 +217,5 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 
 ::::
 
-
-
-## Randomized Messaging
 
 
