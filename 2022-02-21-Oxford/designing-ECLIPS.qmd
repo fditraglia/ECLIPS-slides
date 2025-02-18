@@ -4,37 +4,14 @@ author: "Frank DiTraglia, Ludovica Gazze (and friends!)"
 format: 
   beamer:
     aspectratio: 169
+    header-includes: |
+      \usepackage{tikz}
+      \usetikzlibrary{positioning}
+      \usetikzlibrary{arrows}
+      \usetikzlibrary{shapes}
+      \usetikzlibrary{arrows.meta}
 ---
 
-## What is the ECLIPS Study? 
-
-:::: {.columns}
-
-::: {.column width="70%"}
-
-### Elevated Childhood Lead Interagency Prevalence Study
-- Jane Entwistle, Lindsay Bramwell, *Northumbria*
-- Frank DiTraglia, *Oxford*
-- Ludovica Gazze, *Warwick*
-- Carys Lippiatt, *Leeds Teaching Hospitals*
-- Priya Mondal, Ovnair Sepai, *UKHSA*
-- Jackie Morton, *Health & Safety Executive*
-- Caroline Taylor, *Bristol*
-
-### UKRI Cross Research Countil Responsive Mode Scheme
-
-- Funded from Jan 2025 -- Dec 2027
-- Pilot a home test for childhood lead exposure in Leeds
-- Finger-prick test using Capitainer (at right)
-
-
-:::
-
-::: {.column width="30%"}
-![](../img/capitainer.jpeg)
-:::
-
-::::
 
 ## Background on Childhood Lead Exposure 
 
@@ -82,7 +59,7 @@ Early interventions largely reverse negative effects for lead-exposed children.
 ### Abbasi, DiTraglia, Gazze & Pals (2023; J. Health Econ.)
 Estimate geographic distribution of undetected lead poisoning in Illinois; evaluate alternative screening policies.
 
-## How did I get involved in this project? 
+## Why did I start thinking about this?
 
 |![](../img/guardian2022.png){width=135px} |![](../img/guardian2021.png){width=135px}| ![](../img/guardian2020.png){width=135px}|
 
@@ -105,11 +82,104 @@ Estimate geographic distribution of undetected lead poisoning in Illinois; evalu
 ### 2021 Public Health England (now HSA)
 Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 
+## ECLIPS -- Pilot a Childhood Lead Screening Program 
 
-## Overview of ECLIPS Study 
+:::: {.columns}
 
-Give a broad overview here; maybe show the flowcharts?
+::: {.column width="70%"}
 
+### Elevated Childhood Lead Interagency Prevalence Study
+- Jane Entwistle, Lindsay Bramwell, *Northumbria*
+- Frank DiTraglia, *Oxford*
+- Ludovica Gazze, *Warwick*
+- Carys Lippiatt, *Leeds Teaching Hospitals*
+- Priya Mondal, Ovnair Sepai, *UKHSA*
+- Jackie Morton, *Health & Safety Executive*
+- Caroline Taylor, *Bristol*
+
+### UKRI Cross Research Countil Responsive Mode Scheme
+
+- Funded from Jan 2025 -- Dec 2027
+- Pilot a home test for childhood lead exposure in Leeds
+- Finger-prick test using Capitainer (at right)
+
+
+:::
+
+::: {.column width="30%"}
+![](../img/capitainer.jpeg)
+:::
+
+::::
+
+
+## Overview of ECLIPS Study: Phase I
+
+:::: {.columns}
+
+::: {.column width="35%"}
+
+- Add various points here 
+
+:::
+
+::: {.column width="65%"}
+  \begin{tikzpicture}[scale=0.5]
+  \node (households) [draw,align=center] {All Leeds Residential Addresses \\ $\approx 373,000$};
+  \node (letters) [draw, below of=households, node distance=2cm,align=center] {Send 200,000 Letters};  
+  \node (ineligible) [draw, dashed, below left of=letters, align=center, node distance = 2.5cm] {$\approx180,000$ \\ Ineligible};  
+  \node (eligible) [draw, below right of=letters, align=center, node distance = 2.5cm] {$\approx 20,000$ \\ Eligible};  
+  \node (respond) [draw, below right of=eligible, align=center, node distance=2.5cm] {$\approx 2000$ \\ Baseline Surveys};  
+  \node (nonrespond) [draw, dashed, below left of=eligible, align=center, node distance=2.5cm] {No Response \\ $\approx 18,000$};  
+
+  \draw[->] (households) -- (letters) node[midway, right]{Randomly Sample Addresses};
+  \draw[->, dashed] (letters) -- (ineligible);
+  \draw[->] (letters) -- (eligible) node[midway, right]{$10\%$ with Young Children};
+  \draw[->] (eligible) -- (respond) node[midway, right]{$10\%$ Response };
+  \draw[->, dashed] (eligible) -- (nonrespond);
+\end{tikzpicture}
+
+:::
+
+::::
+
+## Overview of ECLIPS Study: Phase II
+
+:::: {.columns}
+
+::: {.column width="35%"}
+
+- Add various points here 
+
+:::
+
+::: {.column width="65%"}
+
+\begin{tikzpicture}[scale=0.4]
+   \node (kits) [draw, align = center]{Send 500 Blood Test Kits \\ and Midline Surveys};
+   \node (pack) [draw, below right of=kits, align = center, node distance = 2.5cm]{Control\\ 250 Kits};
+   \node(nopack)[draw, below left of =kits, align = center, node distance = 2.5cm]{Treatment \\ 250 Kits};
+   \draw[->] (kits) -- (pack) node[midway, right]{Randomize Kits};
+   \draw[->] (kits) -- (nopack);
+   \node (blood) [draw, below left of=pack,align = center, node distance = 2.5cm]{$\approx 70$ Returned Kits \\ \& Midline Surveys};
+   \node (nobloodnopack) [draw, dashed, below left of=nopack, node distance = 2.5cm, align = center]{No \\ Response};
+   \node (nobloodpack) [draw, dashed, below right of=pack, node distance = 2.5cm, align = center]{No \\ Response};
+   \draw[->] (nopack) -- (blood); 
+   \draw[->] (pack) -- (blood) node[midway, right]{14\% Response};
+   \node (experience) [draw, below of=blood, align = center, node distance = 1.5cm]{Send 200 Experience Surveys};
+   \draw[->, dashed] (nopack) -- (nobloodnopack); 
+   \draw[->, dashed] (pack) -- (nobloodpack);
+   \draw[->, dashed] (nobloodnopack) -- (experience);
+   \draw[->, dashed] (nobloodpack) -- (experience);
+   \draw[->] (blood) -- (experience);
+\end{tikzpicture}
+
+
+:::
+
+::::
+
+## What we'd like feedback on today
 
 ## Randomized Messaging
 
