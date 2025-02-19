@@ -65,28 +65,29 @@ leeds |>
 # floor(weight * n_letters) letters to each LSOA and then *randomly* allocate 
 # the remaining letters with probability proportional to the fractional part 
 # of the weight. Each LSOA gets *at most* one additional letter
-allocate_letters <- function(weights, n_letters) {
+allocate_exactly_n <- function(weights, n) {
  
-  exact <- weights * n_letters # exact, non-integer allocation
+  exact <- weights * n # exact, non-integer allocation
   int_part <- floor(exact) # guaranteed allocation
   frac_part <- exact - int_part # probabilistic allocation
   
-  # How many letters are distributed randomly? 
-  remaining <- n_letters - sum(int_part)
+  # How many are distributed randomly? 
+  remaining <- n - sum(int_part)
   
   # Use fractional parts as probabilities for distributing remaining letters
   # Sample indices with probability proportional to fractional parts
   additional <- numeric(length(weights))
   if (remaining > 0) {
-    chosen <- sample(1:length(weights), size=remaining, prob=frac_part, replace=FALSE)
+    chosen <- sample(1:length(weights), size = remaining, prob = frac_part, 
+                     replace = FALSE)
     additional[chosen] <- 1
   }
   int_part + additional # final allocation
 }
 
 leeds <- leeds |> 
-  mutate(n_letters_households = allocate_letters(w_households, n_letters),
-         n_letters_eligible = allocate_letters(w_eligible_households, n_letters))
+  mutate(n_letters_households = allocate_exactly_n(w_households, n_letters),
+         n_letters_eligible = allocate_exactly_n(w_eligible_households, n_letters))
 
 # Sanity check: the letters sent under either weighting scheme should sum
 # to n_letters
@@ -105,7 +106,22 @@ leeds |>
        x = "Letters allocated by number of households",
        y = "Letters allocated by number of eligible households")
 
+letters_households <- leeds |>  
+  pull(n_letters_households)
 
+letters_eligible <- leeds |>  
+  pull(n_letters_eligible)
+
+# Use weights from 2021 census to project the number of households and eligible
+# households in each LSOA in 2024 based on the number of addresses, using the
+# same tie-breaking rule as above
+n_households <- leeds |> 
+  pull(w_households) |> 
+  allocate_exactly_n(n_addresses)
+
+n_eligible_households <- leeds |> 
+  pull(w_eligible_households) |>
+  allocate_exactly_n(n_addresses)
 
 # Simulation study to compare sampling methods
  
@@ -155,13 +171,30 @@ plot_beta(mean = 0.1, sd = 0.01, upper = 0.15)
 plot_beta(mean = 0.05, sd = 0.01, upper = 0.15)
 plot_beta(mean = 0.01, sd = 0.01, upper = 0.15)
 
+
+
+
 # Hard-code number of LSOAs in Leeds: 488
-sim_response_rate <- function(mean, sd, n = 488) {
-  params <- beta_params(mean, sd)
-  rbeta(n, params$alpha, params$beta)
-}
+#sim_response_rate <- function(mean, sd, n = 488) {
+#  params <- beta_params(mean, sd)
+#  rbeta(n, params$alpha, params$beta)
+#}
+
+# Simulate response rates for each LSOA under each weighting scheme
+p_eligible <- leeds |> 
+  pull(frac_eligible)
+
+params <- beta_params(0.1, 0.01)
+sim_response_rates <- rbeta(n_lsoas, params$alpha, params$beta)
+
+foo1 <- rbinom(n_lsoas, size = letters_households, prob = p_eligible)
+foo2 <- rbinom(n_lsoas, size = foo1, prob = sim_response_rates)
+sum(foo2)
 
 
+bar1 <- rbinom(n_lsoas, size = letters_eligible, prob = p_eligible)
+bar2 <- rbinom(n_lsoas, size = bar1, prob = sim_response_rates)
+sum(bar2)
 
 
  
