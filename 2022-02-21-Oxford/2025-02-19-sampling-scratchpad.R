@@ -1,6 +1,7 @@
 library(tidyverse)
 set.seed(1983)
 
+# Here eligible is defined as having a child aged 0-9 from 2021 Census data
 leeds <- read_csv("~/ECLIPS-slides/data/household_age_data.csv") |> 
   select(lsoa = Lower.layer.Super.Output.Areas,
          n_households = total_number_of_households,
@@ -32,6 +33,9 @@ n_lsoas <- nrow(leeds)
 
 n_addresses <- 373000
 
+# Is this population change? Are these vacant addresses? Have M look for data
+# on number of vacant properties (we know this is available in US Census)
+# (Vacant dwellings) We may want to take this into account in our sampling design
 c(`Addresses (2024 Council Tax)` = n_addresses, 
   `Households (2021 Census)` = n_households) 
 
@@ -169,7 +173,8 @@ plot_beta <- function(mean, sd, upper = 1, n_points = 1000) {
 # Take 10% as a baseline response rate but consider lower ones as well
 plot_beta(mean = 0.1, sd = 0.01, upper = 0.15)
 plot_beta(mean = 0.05, sd = 0.01, upper = 0.15)
-plot_beta(mean = 0.01, sd = 0.01, upper = 0.15)
+plot_beta(mean = 0.01, sd = 0.005, upper = 0.15)
+plot_beta(mean = 0.01, sd = 0.002, upper = 0.15)
 
 
 
@@ -184,18 +189,26 @@ plot_beta(mean = 0.01, sd = 0.01, upper = 0.15)
 p_eligible <- leeds |> 
   pull(frac_eligible)
 
-params <- beta_params(0.1, 0.01)
-sim_response_rates <- rbeta(n_lsoas, params$alpha, params$beta)
 
-foo1 <- rbinom(n_lsoas, size = letters_households, prob = p_eligible)
-foo2 <- rbinom(n_lsoas, size = foo1, prob = sim_response_rates)
-sum(foo2)
+simulate_design <- function(beta_mean, beta_sd, nreps = 1000) {
+  params <- beta_params(beta_mean, beta_sd)
+  sim_response_rates <- rbeta(n_lsoas, params$alpha, params$beta)
+  
+  baseline1 <- rbinom(n_lsoas, size = letters_households, prob = p_eligible)
+  baseline2 <- rbinom(n_lsoas, size = baseline1, prob = sim_response_rates)
+  baseline <- sum(baseline2)
+  
+  eligible1 <- rbinom(n_lsoas, size = letters_eligible, prob = p_eligible)
+  eligible2 <- rbinom(n_lsoas, size = eligible1, prob = sim_response_rates)
+  eligible <- sum(eligible2)
+  
+  tibble(baseline = baseline, eligible = eligible)
+}
 
-
-bar1 <- rbinom(n_lsoas, size = letters_eligible, prob = p_eligible)
-bar2 <- rbinom(n_lsoas, size = bar1, prob = sim_response_rates)
-sum(bar2)
-
+simulate_design(0.1, 0.01)
+simulate_design(0.01, 0.01)
+simulate_design(0.01, 0.001)
+simulate_design(0.5, 0.5)
 
  
   
