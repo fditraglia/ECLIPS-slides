@@ -39,7 +39,7 @@ n_addresses <- 373000
 c(`Addresses (2024 Council Tax)` = n_addresses, 
   `Households (2021 Census)` = n_households) 
 
-n_letters <- 150000
+n_letters <- 30000 # suppose our initial sample is 20% of the 150,000 letters 
 
 
 # How many letters to send to each LSOA? Calculate two sets of sampling weights:
@@ -61,8 +61,8 @@ leeds |>
   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
   labs(title = "Sampling weights for each LSOA",
        subtitle = "Weights based on number of households and number of eligible households",
-       x = "Weight by number of households",
-       y = "Weight by number of eligible households")
+       x = "Stratify by number of households",
+       y = "Stratify by number of eligible households")
 
 
 # can't send fractional letters, but want to send exactly n_letters, so send out
@@ -107,8 +107,8 @@ leeds |>
   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
   labs(title = "Number of letters sent to each LSOA",
        subtitle = "Letters allocated based on number of households and number of eligible households",
-       x = "Letters allocated by number of households",
-       y = "Letters allocated by number of eligible households")
+       x = "Stratify by number of households",
+       y = "Stratify by number of eligible households")
 
 letters_households <- leeds |>  
   pull(n_letters_households)
@@ -173,17 +173,8 @@ plot_beta <- function(mean, sd, upper = 1, n_points = 1000) {
 # Take 10% as a baseline response rate but consider lower ones as well
 plot_beta(mean = 0.1, sd = 0.01, upper = 0.15)
 plot_beta(mean = 0.05, sd = 0.01, upper = 0.15)
-plot_beta(mean = 0.01, sd = 0.005, upper = 0.15)
-plot_beta(mean = 0.01, sd = 0.002, upper = 0.15)
+plot_beta(mean = 0.01, sd = 0.01, upper = 0.15)
 
-
-
-
-# Hard-code number of LSOAs in Leeds: 488
-#sim_response_rate <- function(mean, sd, n = 488) {
-#  params <- beta_params(mean, sd)
-#  rbeta(n, params$alpha, params$beta)
-#}
 
 # Simulate response rates for each LSOA under each weighting scheme
 p_eligible <- leeds |> 
@@ -205,10 +196,50 @@ simulate_design <- function(beta_mean, beta_sd, nreps = 1000) {
   tibble(baseline = baseline, eligible = eligible)
 }
 
-simulate_design(0.1, 0.01)
-simulate_design(0.01, 0.01)
-simulate_design(0.01, 0.001)
-simulate_design(0.5, 0.5)
 
+# Use purrr to repeatedly call simulate_design() with the same parameters, a 
+# total of nreps times, and store the results in a tibble
+nreps <- 1000
+sim_high_response <- map(1:nreps, ~ simulate_design(0.1, 0.01)) |> 
+  bind_rows()
  
-  
+sim_mid_response <- map(1:nreps, ~ simulate_design(0.05, 0.01)) |> 
+  bind_rows() 
+
+sim_low_response <- map(1:nreps, ~ simulate_design(0.01, 0.01)) |> 
+  bind_rows()
+
+# Make a ggplot histogram of the number of responses under each weighting scheme
+# use transparency to show the histograms "baseline" and "eligible" on the same 
+# plot
+sim_high_response |> 
+  pivot_longer(cols = everything(), names_to = "scheme") |> 
+  ggplot(aes(x = value, fill = scheme)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(title = "Simulated number of responses under each sampling scheme",
+       subtitle = "Beta response rates for eligible: mean = 10%, SD = 10%",
+       x = "Number of responses",
+       y = "Count") +
+  theme(legend.position = "top")
+
+# Same for mid response
+sim_mid_response |> 
+  pivot_longer(cols = everything(), names_to = "scheme") |> 
+  ggplot(aes(x = value, fill = scheme)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(title = "Simulated number of responses under each sampling scheme",
+       subtitle = "Beta response rates for eligible: mean = 5%, SD = 1%",
+       x = "Number of responses",
+       y = "Count") +
+  theme(legend.position = "top")
+
+# And finally, same for low response
+sim_low_response |> 
+  pivot_longer(cols = everything(), names_to = "scheme") |> 
+  ggplot(aes(x = value, fill = scheme)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(title = "Simulate number of responses under each sampling scheme",
+       subtitle = "Beta response rates for eligible: mean = 1%, SD = 1%",
+       x = "Number of responses",
+       y = "Count") +
+  theme(legend.position = "top")
