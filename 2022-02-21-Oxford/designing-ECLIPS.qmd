@@ -4,7 +4,9 @@ author: "Frank DiTraglia, Ludovica Gazze (and friends!)"
 format: 
   beamer:
     aspectratio: 169
+    theme: default
     header-includes: |
+      \setbeamertemplate{footline}{\hfill\insertframenumber\,/\,\inserttotalframenumber\hspace{2em}\vspace{1ex}} 
       \usepackage{tikz}
       \usetikzlibrary{positioning}
       \usetikzlibrary{arrows}
@@ -112,6 +114,21 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 
 ::::
 
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-calm.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-frantic.png)
+:::
+
+::::
 
 ## Literature review /motivation about take-up?
 
@@ -139,7 +156,9 @@ Why is take-up / selection into testing interesting from an Econ perspective? Th
 
 ::: {.column width="35%"}
 
-- What we proposed in the grant: now we're thinking of some changes. 
+- From our grant proposal
+- Considering changes 
+- You can help us decide!
 
 :::
 
@@ -169,7 +188,9 @@ Why is take-up / selection into testing interesting from an Econ perspective? Th
 
 ::: {.column width="35%"}
 
-- What we proposed in the grant: now we're thinking of some changes. 
+- From our grant proposal
+- Considering changes 
+- You can help us decide!
 
 :::
 
@@ -219,6 +240,44 @@ If we have time: interested to hear what it would be interesting to randomize he
 1. Which comparison is most interesting from a research perspective?
 2. What to pick as a baseline / control from among the less interesting questions? 
 
+
+## Letter Design Elements for Lead Testing Study
+
+### Personalized Risk Information
+- Considering personalization based on housing age (pre-XXXX construction)
+- Research question: Effect of housing age information on lead awareness
+- Need control group receiving general lead information to isolate personalization effect
+
+### Blood Testing Language
+- Testing terminology options: "at-home test" vs "finger prick" vs "drop of blood"
+- Initial response rates likely higher with less explicit blood mentions
+- Consider optimizing for kit return rates rather than just initial responses
+- Opportunity to screen for committed participants through blood test framing
+
+### Risk Communication Level
+- Current draft letter identified as insufficiently specific about risks
+- Consider standardizing detailed risk information across all letters
+- Compare to ELSA diabetes study where health risks were widely understood
+
+### Lead Exposure Sources
+- Potential to include information about common exposure pathways
+- Focus on child-relevant sources:
+  - Toys
+  - Old playgrounds
+  - Contaminated soil
+  - Other environmental factors
+
+### Participation Benefits Framing
+- Multiple potential approaches to communicate value:
+  - Public health contribution angle (altruistic motivation)
+  - Personal health information benefits
+  - Could test positive vs negative framing
+- May be better treated as design decisions rather than research questions
+
+### Questions for Review
+- Which elements offer the most compelling research potential?
+- For lower-priority research questions, what are the recommended design choices?
+
 ## Stratified Sampling
 
 :::: {.columns}
@@ -233,6 +292,22 @@ If we have time: interested to hear what it would be interesting to randomize he
 
 ![](../img/eligible_households.png)
 
+:::
+
+::::
+
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-without-surprise.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-with-surprise.png)
 :::
 
 ::::
