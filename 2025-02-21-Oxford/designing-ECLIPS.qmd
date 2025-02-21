@@ -136,7 +136,7 @@ Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
 - Which families are willing to participate? (Selection into testing)
    - Dutz et al (2023) "What Drives (Gaps In) Scientific Study Participation?"
    - 6% un-incentivized response rate: 10\% for low poverty, 2\% for high
-   - 17% with $100 incentive: 24\$ for low poverty, 8% for high
+   - 17% with $100 incentive: 24\% for low poverty, 8% for high
 - Estimates of exposure risk (housing age etc) correlate negatively with income 
 - Which families are more likely to return a valid sample?
 - What motivates participation? Info about child's health? Altruism? 
