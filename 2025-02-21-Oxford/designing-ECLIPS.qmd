@@ -1,0 +1,317 @@
+---
+title: "Designing the ECLIPS Study"
+author: "Frank DiTraglia, Ludovica Gazze (and friends!)"
+format: 
+  beamer:
+    aspectratio: 169
+    theme: default
+    header-includes: |
+      \setbeamertemplate{footline}{\hfill\insertframenumber\,/\,\inserttotalframenumber\hspace{2em}\vspace{1ex}} 
+      \usepackage{tikz}
+      \usetikzlibrary{positioning}
+      \usetikzlibrary{arrows}
+      \usetikzlibrary{shapes}
+      \usetikzlibrary{arrows.meta}
+---
+
+
+## Background on Childhood Lead Exposure 
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+### Lead is a potent neurotoxin
+- Toxic whether inhaled or ingested
+- Most harmful to young children 
+- Harm from even low levels of exposure 
+
+### Didn't we get rid of the lead?
+- Lead paint and pipes in older homes
+- Soil near major roads still contaminated 
+- Industrial pollution, traditional products
+
+### US Policy Landscape
+- EPA regulations for renovation (lead paint)
+- Mandated screening of children on Medicaid 
+- Screening for representative sample: NHANES 
+
+:::
+
+::: {.column width="40%"}
+![](../img/tweet-whitehouse.png)
+:::
+
+::::
+
+## Some Econ Papers on Lead Exposure 
+
+### Aizer & Currie (2018; AEJ Applied)
+Lower BLLs explain 75% of decline in school suspensions from 1994-2015 in RI
+
+### Aizer, Currie, Simon & Vivier (2019; ReStat)
+Low levels of lead (BLL $\leq$ 5) have a discernible negative affect on test scores.
+
+### Groenqvist, Nilsson & Robling (2020; JPE)
+Long-term effects on human capital and crime from low doses of lead
+
+### Billings & Schnepel (2018; AEJ Applied)
+Early interventions largely reverse negative effects for lead-exposed children.
+
+### Abbasi, DiTraglia, Gazze & Pals (2023; J. Health Econ.)
+Estimate geographic distribution of undetected lead poisoning in Illinois; evaluate alternative screening policies.
+
+## Why did I start thinking about this?
+
+|![](../img/guardian2022.png){width=135px} |![](../img/guardian2021.png){width=135px}| ![](../img/guardian2020.png){width=135px}|
+
+
+##
+
+![](../img/UK-vs-US-housing-age.png)
+
+## There is no lead screening in the UK whatsoever. 
+
+### 2018 National Screening Committee Report
+
+>The volume, quality, and direction of evidence published since 2012 does not indicate that screening for elevated BLLs should be recommended in the UK. Several uncertainties remain across key criteria including: lack of evidence that elevated BLLs in children is an important health problem in terms of UK prevalence.
+
+
+### 2019 Lead Exposure in Children Surveillance System Report
+
+> There are no recent comprehensive survey data estimating how many children in England are exposed to lead.
+
+### 2021 Public Health England (now HSA)
+Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
+
+## ECLIPS -- Pilot a Childhood Lead Screening Program 
+
+:::: {.columns}
+
+::: {.column width="70%"}
+
+### Elevated Childhood Lead Interagency Prevalence Study
+- Jane Entwistle, Lindsay Bramwell, *Northumbria*
+- Frank DiTraglia, *Oxford*
+- Ludovica Gazze, *Warwick*
+- Carys Lippiatt, *Leeds Teaching Hospitals*
+- Priya Mondal, Ovnair Sepai, *UKHSA*
+- Jackie Morton, *Health & Safety Executive*
+- Caroline Taylor, *Bristol*
+
+### UKRI Cross Research Countil Responsive Mode Scheme
+
+- Funded from Jan 2025 -- Dec 2027
+- Pilot a home test for childhood lead exposure in Leeds
+- Finger-prick test using Capitainer (at right)
+
+
+:::
+
+::: {.column width="30%"}
+![](../img/capitainer.jpeg)
+:::
+
+::::
+
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-calm.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-frantic.png)
+:::
+
+::::
+
+## Learning as much as we can even if fail to get usable samples 
+
+- What fraction of families are willing to participate in home screening?
+- Which families are willing to participate? (Selection into testing)
+   - Dutz et al (2023) "What Drives (Gaps In) Scientific Study Participation?"
+   - 6% un-incentivized response rate: 10\% for low poverty, 2\% for high
+   - 17% with $100 incentive: 24\$ for low poverty, 8% for high
+- Estimates of exposure risk (housing age etc) correlate negatively with income 
+- Which families are more likely to return a valid sample?
+- What motivates participation? Info about child's health? Altruism? 
+
+### Testing Details 
+- Device requires one good-sized drop of blood ($\approx 17$ microliters)
+- Extracting it, requires parents to apply a lancet to child's finger (1-2 mm depth) 
+- Planned for kids 6 months to 6 years, but 6 months seems less likely now
+- Anecdote from our colleague Joe: hard to get your kid to cooperate!
+<!--- ELSA study? Take-up results? (Couldn't find take-up)-->
+
+
+
+## Overview of Phase I -- From Our Proposal
+
+\centering
+  \begin{tikzpicture}[scale=0.5]
+  \node (households) [draw,align=center] {All Leeds Residential Addresses \\ $\approx 373,000$};
+  \node (letters) [draw, below of=households, node distance=2cm,align=center] {Send 200,000 Letters};  
+  \node (ineligible) [draw, dashed, below left of=letters, align=center, node distance = 2.5cm] {$\approx180,000$ \\ Ineligible};  
+  \node (eligible) [draw, below right of=letters, align=center, node distance = 2.5cm] {$\approx 20,000$ \\ Eligible};  
+  \node (respond) [draw, below right of=eligible, align=center, node distance=2.5cm] {$\approx 2000$ \\ Baseline Surveys};  
+  \node (nonrespond) [draw, dashed, below left of=eligible, align=center, node distance=2.5cm] {No Response \\ $\approx 18,000$};  
+
+  \draw[->] (households) -- (letters) node[midway, right]{Randomly Sample Addresses};
+  \draw[->, dashed] (letters) -- (ineligible);
+  \draw[->] (letters) -- (eligible) node[midway, right]{$10\%$ with Young Children};
+  \draw[->] (eligible) -- (respond) node[midway, right]{$10\%$ Response };
+  \draw[->, dashed] (eligible) -- (nonrespond);
+\end{tikzpicture}
+
+5 GBP gift card for sign-up and baseline survey completion 
+
+## Overview of Phase II -- From Our Proposal
+
+Baseline survey \& census: choose probs of sending each household a kit (2000 to 500) 
+
+\centering
+\begin{tikzpicture}[scale=0.4]
+   \node (kits) [draw, align = center]{Send 500 Blood Test Kits \\ and Midline Surveys};
+   \node (pack) [draw, below right of=kits, align = center, node distance = 2.5cm]{Control\\ 250 Kits};
+   \node(nopack)[draw, below left of =kits, align = center, node distance = 2.5cm]{Treatment \\ 250 Kits};
+   \draw[->] (kits) -- (pack) node[midway, right]{Randomize Kits};
+   \draw[->] (kits) -- (nopack);
+   \node (blood) [draw, below left of=pack,align = center, node distance = 2.5cm]{$\approx 70$ Returned Kits \\ \& Midline Surveys};
+   \node (nobloodnopack) [draw, dashed, below left of=nopack, node distance = 2.5cm, align = center]{No \\ Response};
+   \node (nobloodpack) [draw, dashed, below right of=pack, node distance = 2.5cm, align = center]{No \\ Response};
+   \draw[->] (nopack) -- (blood); 
+   \draw[->] (pack) -- (blood) node[midway, right]{14\% Response};
+   \node (experience) [draw, below of=blood, align = center, node distance = 1.5cm]{Send 200 Experience Surveys};
+   \draw[->, dashed] (nopack) -- (nobloodnopack); 
+   \draw[->, dashed] (pack) -- (nobloodpack);
+   \draw[->, dashed] (nobloodnopack) -- (experience);
+   \draw[->, dashed] (nobloodpack) -- (experience);
+   \draw[->] (blood) -- (experience);
+\end{tikzpicture}
+
+35 GBP for returned sample / midline survey; 10 GBP for experience survey
+
+
+## What we'd like feedback on today
+
+### Randomized Outreach Messages
+Test effect of different outreach messages on participation; what's interesting here?
+
+ 
+### Sampling Plan
+Two-stage, adaptive, stratified sampling plan. Comments / concerns?
+
+### Randomized Test Kits
+If we have time: what might be interesting to randomize here? 
+
+
+## Randomized Messaging: Overview
+
+### What to put in our recruiting letter?
+Many possibilities: why not randomize something to see what improves take-up?
+
+### Possible Comparisons
+- Personalized Risk Information
+- Blood Testing Language
+- Risk Communication Level
+- Lead Exposure Sources
+- Framing Benefits from Participation
+
+### Questions for our Expert Audience
+
+1. Which comparisons are most interesting from a research perspective?
+2. What to pick as a baseline / control from among the less interesting questions? 
+
+
+## Recruitment Messaging: Details 
+
+### Personalized Risk Information
+- Merged EPC certificates for Leeds with residential addresses
+- Gives us age of 250k properties (out of $\approx$ 373k)
+- "Our records indicate that your home was built before XXXX so it might have lead paint or pipes. Taking part can help you learn if these may affect your child's health." 
+
+### Lead Exposure Sources
+- "Lead can be found in various products including XXXX. Taking part can help you learn if any of these affect your child."
+- Does it matter which sources we list? How many? Child-relevant only?
+
+
+## Recruitment Messaging: Details 
+
+### Blood Testing Language
+- Consent forms and participation leaflet will explain about the blood test. - Should we mention blood in the recruitment letter itself?
+- Con: people may not read further. Pro: only committed participants proceed.
+
+### Framing Benefits from Participation
+- Private benefits "learn information about your child's health" 
+- Altruism / Public Health: "help us learn how to improve the health of UK children"
+
+## Stratified Sampling
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+### Budget
+Send outreach letters to $\approx 40\%$ of residential addresses in Leeds.
+
+### Simple Random Sample
+Choose 40\% of addresses at random, without replacement.
+
+### Stratified Random Sample
+More letters to LSOAs where more households have kids (census)
+
+
+:::
+
+::: {.column width="60%"}
+
+![](../img/eligible_households.png)
+
+:::
+
+::::
+
+### Adaptive Sampling?
+Considering sending 20\% of letters initially, modeling the response rates based on LSOA \& respondent characteristics and adjusting the sampling scheme for the remaining 80\%
+
+
+
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-without-surprise.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-with-surprise.png)
+:::
+
+::::
+
+## Randomized Test Kits
+
+- We have the opportunity to randomize the test kits
+- Considered a toy for kids, but hard to find something:
+   - age-appropriate (6 months to 6 year!)
+   - not choking hazard
+   - fits in flat pack
+- Considering stickers instead. Potentially randomize delayed reward / surprise? 
+   - Stickers in envelope to be opened afterwards?
+- Other ideas?
+
+## Thank you for your time and suggestions!
+
+![](../img/pooh.jpg){width=500px}
+
+
+
+
