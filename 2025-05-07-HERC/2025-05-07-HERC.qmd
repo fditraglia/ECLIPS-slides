@@ -1,0 +1,648 @@
+---
+title: "Childhood Lead Exposure in Illinois and Leeds"
+author: "Frank DiTraglia"
+institute: "Department of Economics, University of Oxford"
+format: 
+  beamer:
+    aspectratio: 169
+    theme: default
+    header-includes: |
+      \setbeamertemplate{footline}{\hfill\insertframenumber\,/\,\inserttotalframenumber\hspace{2em}\vspace{1ex}} 
+      \usepackage{tikz}
+      \usetikzlibrary{positioning}
+      \usetikzlibrary{arrows}
+      \usetikzlibrary{shapes}
+      \usetikzlibrary{arrows.meta}
+---
+
+## My Research Interests 
+
+
+:::: {.columns}
+
+::: {.column width="20%"}
+
+![](../img/frank-qr.pdf)
+:::
+
+::: {.column width="80%"}
+
+### Econometrics
+Causal Inference, Spillovers, Measurement Error, Model Selection, Bayesian Inference
+
+### Applied Work
+Childhood Lead Exposure, Pawn Lending in Mexico City, Colombian Civil conflict
+
+:::
+
+::::
+
+
+## Background on Childhood Lead Exposure 
+
+:::: {.columns}
+
+::: {.column width="60%"}
+
+### Lead is a potent neurotoxin
+- Toxic whether inhaled or ingested
+- Most harmful to young children 
+- Harm from even low levels of exposure 
+
+### Didn't we get rid of the lead?
+- Lead paint and pipes in older homes
+- Soil near major roads still contaminated 
+- Industrial pollution, traditional products
+
+### US Policy Landscape
+- EPA regulations for renovation (lead paint)
+- Mandated screening of children on Medicaid 
+- Screening for representative sample: NHANES 
+
+:::
+
+::: {.column width="40%"}
+![](../img/tweet-whitehouse.png)
+:::
+
+::::
+
+## Some Econ Papers on Lead Exposure 
+
+### Aizer & Currie (2018; AEJ Applied)
+Lower BLLs explain 75% of decline in school suspensions from 1994-2015 in RI
+
+### Aizer, Currie, Simon & Vivier (2019; ReStat)
+Low levels of lead (BLL $\leq$ 5) have a discernible negative affect on test scores.
+
+### Groenqvist, Nilsson & Robling (2020; JPE)
+Long-term effects on human capital and crime from low doses of lead
+
+### Billings & Schnepel (2018; AEJ Applied)
+Early interventions largely reverse negative effects for lead-exposed children.
+
+### Abbasi, DiTraglia, Gazze & Pals (2023; J. Health Econ.)
+Estimate geographic distribution of undetected lead poisoning in Illinois; evaluate alternative screening policies.
+
+## Why did I start thinking about this?
+
+|![](../img/guardian2022.png){width=135px} |![](../img/guardian2021.png){width=135px}| ![](../img/guardian2020.png){width=135px}|
+
+
+##
+
+![](../img/UK-vs-US-housing-age.png)
+
+## There is no lead screening in the UK whatsoever. 
+
+### 2018 National Screening Committee Report
+
+>The volume, quality, and direction of evidence published since 2012 does not indicate that screening for elevated BLLs should be recommended in the UK. Several uncertainties remain across key criteria including: lack of evidence that elevated BLLs in children is an important health problem in terms of UK prevalence.
+
+
+### 2019 Lead Exposure in Children Surveillance System Report
+
+> There are no recent comprehensive survey data estimating how many children in England are exposed to lead.
+
+### 2021 Public Health England (now HSA)
+Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
+
+## ECLIPS -- Pilot a Childhood Lead Screening Program 
+
+:::: {.columns}
+
+::: {.column width="70%"}
+
+### Elevated Childhood Lead Interagency Prevalence Study
+- Jane Entwistle, Lindsay Bramwell, *Northumbria*
+- Frank DiTraglia, *Oxford*
+- Ludovica Gazze, *Warwick*
+- Carys Lippiatt, *Leeds Teaching Hospitals*
+- Priya Mondal, Ovnair Sepai, *UKHSA*
+- Jackie Morton, *Health & Safety Executive*
+- Caroline Taylor, *Bristol*
+
+### UKRI Cross Research Countil Responsive Mode Scheme
+
+- Funded from Jan 2025 -- Dec 2027
+- Pilot a home test for childhood lead exposure in Leeds
+- Finger-prick test using Capitainer (at right)
+
+
+:::
+
+::: {.column width="30%"}
+![](../img/capitainer.jpeg)
+:::
+
+::::
+
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-calm.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-frantic.png)
+:::
+
+::::
+
+## Learning as much as we can even if fail to get usable samples 
+
+- What fraction of families are willing to participate in home screening?
+- Which families are willing to participate? (Selection into testing)
+   - Dutz et al (2023) "What Drives (Gaps In) Scientific Study Participation?"
+   - 6% un-incentivized response rate: 10\% for low poverty, 2\% for high
+   - 17% with $100 incentive: 24\% for low poverty, 8% for high
+- Estimates of exposure risk (housing age etc) correlate negatively with income 
+- Which families are more likely to return a valid sample?
+- What motivates participation? Info about child's health? Altruism? 
+
+### Testing Details 
+- Device requires one good-sized drop of blood ($\approx 17$ microliters)
+- Extracting it, requires parents to apply a lancet to child's finger (1-2 mm depth) 
+- Planned for kids 6 months to 6 years, but 6 months seems less likely now
+- Anecdote from our colleague Joe: hard to get your kid to cooperate!
+<!--- ELSA study? Take-up results? (Couldn't find take-up)-->
+
+
+
+## Overview of Phase I -- From Our Proposal
+
+\centering
+  \begin{tikzpicture}[scale=0.5]
+  \node (households) [draw,align=center] {All Leeds Residential Addresses \\ $\approx 373,000$};
+  \node (letters) [draw, below of=households, node distance=2cm,align=center] {Send 200,000 Letters};  
+  \node (ineligible) [draw, dashed, below left of=letters, align=center, node distance = 2.5cm] {$\approx180,000$ \\ Ineligible};  
+  \node (eligible) [draw, below right of=letters, align=center, node distance = 2.5cm] {$\approx 20,000$ \\ Eligible};  
+  \node (respond) [draw, below right of=eligible, align=center, node distance=2.5cm] {$\approx 2000$ \\ Baseline Surveys};  
+  \node (nonrespond) [draw, dashed, below left of=eligible, align=center, node distance=2.5cm] {No Response \\ $\approx 18,000$};  
+
+  \draw[->] (households) -- (letters) node[midway, right]{Randomly Sample Addresses};
+  \draw[->, dashed] (letters) -- (ineligible);
+  \draw[->] (letters) -- (eligible) node[midway, right]{$10\%$ with Young Children};
+  \draw[->] (eligible) -- (respond) node[midway, right]{$10\%$ Response };
+  \draw[->, dashed] (eligible) -- (nonrespond);
+\end{tikzpicture}
+
+5 GBP gift card for sign-up and baseline survey completion 
+
+## Overview of Phase II -- From Our Proposal
+
+Baseline survey \& census: choose probs of sending each household a kit (2000 to 500) 
+
+\centering
+\begin{tikzpicture}[scale=0.4]
+   \node (kits) [draw, align = center]{Send 500 Blood Test Kits \\ and Midline Surveys};
+   \node (pack) [draw, below right of=kits, align = center, node distance = 2.5cm]{Control\\ 250 Kits};
+   \node(nopack)[draw, below left of =kits, align = center, node distance = 2.5cm]{Treatment \\ 250 Kits};
+   \draw[->] (kits) -- (pack) node[midway, right]{Randomize Kits};
+   \draw[->] (kits) -- (nopack);
+   \node (blood) [draw, below left of=pack,align = center, node distance = 2.5cm]{$\approx 70$ Returned Kits \\ \& Midline Surveys};
+   \node (nobloodnopack) [draw, dashed, below left of=nopack, node distance = 2.5cm, align = center]{No \\ Response};
+   \node (nobloodpack) [draw, dashed, below right of=pack, node distance = 2.5cm, align = center]{No \\ Response};
+   \draw[->] (nopack) -- (blood); 
+   \draw[->] (pack) -- (blood) node[midway, right]{14\% Response};
+   \node (experience) [draw, below of=blood, align = center, node distance = 1.5cm]{Send 200 Experience Surveys};
+   \draw[->, dashed] (nopack) -- (nobloodnopack); 
+   \draw[->, dashed] (pack) -- (nobloodpack);
+   \draw[->, dashed] (nobloodnopack) -- (experience);
+   \draw[->, dashed] (nobloodpack) -- (experience);
+   \draw[->] (blood) -- (experience);
+\end{tikzpicture}
+
+35 GBP for returned sample / midline survey; 10 GBP for experience survey
+
+
+## What we'd like feedback on today
+
+### Randomized Outreach Messages
+Test effect of different outreach messages on participation; what's interesting here?
+
+ 
+### Sampling Plan
+Two-stage, adaptive, stratified sampling plan. Comments / concerns?
+
+### Randomized Test Kits
+If we have time: what might be interesting to randomize here? 
+
+
+## Randomized Messaging: Overview
+
+### What to put in our recruiting letter?
+Many possibilities: why not randomize something to see what improves take-up?
+
+### Possible Comparisons
+- Personalized Risk Information
+- Blood Testing Language
+- Risk Communication Level
+- Lead Exposure Sources
+- Framing Benefits from Participation
+
+### Questions for our Expert Audience
+
+1. Which comparisons are most interesting from a research perspective?
+2. What to pick as a baseline / control from among the less interesting questions? 
+
+
+## Recruitment Messaging: Details 
+
+### Personalized Risk Information
+- Merged EPC certificates for Leeds with residential addresses
+- Gives us age of 250k properties (out of $\approx$ 373k)
+- "Our records indicate that your home was built before XXXX so it might have lead paint or pipes. Taking part can help you learn if these may affect your child's health." 
+
+### Lead Exposure Sources
+- "Lead can be found in various products including XXXX. Taking part can help you learn if any of these affect your child."
+- Does it matter which sources we list? How many? Child-relevant only?
+
+
+## Recruitment Messaging: Details 
+
+### Blood Testing Language
+- Consent forms and participation leaflet will explain about the blood test. - Should we mention blood in the recruitment letter itself?
+- Con: people may not read further. Pro: only committed participants proceed.
+
+### Framing Benefits from Participation
+- Private benefits "learn information about your child's health" 
+- Altruism / Public Health: "help us learn how to improve the health of UK children"
+
+## Stratified Sampling
+
+:::: {.columns}
+
+::: {.column width="40%"}
+
+### Budget
+Send outreach letters to $\approx 40\%$ of residential addresses in Leeds.
+
+### Simple Random Sample
+Choose 40\% of addresses at random, without replacement.
+
+### Stratified Random Sample
+More letters to LSOAs where more households have kids (census)
+
+
+:::
+
+::: {.column width="60%"}
+
+![](../img/eligible_households.png)
+
+:::
+
+::::
+
+### Adaptive Sampling?
+Considering sending 20\% of letters initially, modeling the response rates based on LSOA \& respondent characteristics and adjusting the sampling scheme for the remaining 80\%
+
+
+
+---
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+![](../img/child-without-surprise.png)
+
+:::
+
+::: {.column width="50%"}
+![](../img/child-with-surprise.png)
+:::
+
+::::
+
+## Randomized Test Kits
+
+- We have the opportunity to randomize the test kits
+- Considered a toy for kids, but hard to find something:
+   - age-appropriate (6 months to 6 year!)
+   - not choking hazard
+   - fits in flat pack
+- Considering stickers instead. Potentially randomize delayed reward / surprise? 
+   - Stickers in envelope to be opened afterwards?
+- Other ideas?
+
+## Thank you for your time and suggestions!
+
+![](../img/pooh.jpg){width=500px}
+
+
+
+
+
+## People are talking about lead
+
+:::: {.columns}
+
+::: {.column width="60%"}
+- Prominent news stories, esp.\ Flint Michigan
+- \$15 billion for lead pipe remediation in 2021 US infrastructure bill 
+- Chicago Fed working on a project related to lead service line replacement
+- People outside the Fed and White House are involved too... 
+:::
+
+::: {.column width="40%"}
+![](../img/tweet-whitehouse.png)
+:::
+
+::::
+
+## 
+
+![](../img/oliver-sesame-street.jpg)
+
+## How I got interested in this topic. 
+
+|![](../img/guardian2022.png){width=135px} |![](../img/guardian2021.png){width=135px}| ![](../img/guardian2020.png){width=135px}|
+
+# Background
+
+## Some questions you may be asking yourself 
+
+1. Is lead really a big deal?
+2. Didn't we get rid of all the lead?
+3. What should we do about it?
+4. Why should economists study this?
+
+## What's so bad about lead?
+
+### Lead is a potent neurotoxin
+- Toxic whether inhaled or ingested: "mimics" calcium, disrupting all biological processes that depend on it.
+- Harms reproductive, hematopoietic, endocrine, renal systems.
+- Particularly harmful to **central nervous system**: calcium crucial for neurotransmission $\implies$ damage to prefrontal cortex, hippocampus, cerebellum
+
+### Lead is most harmful at younger ages 
+- Permanent damage to developing nervous systems.
+- Blood-brain barrier more permeable in young children.
+- Digestive systems of children more likely to absorb ingested lead.
+- Lead accumulates in bone and *stays there* even after leaving the blood.
+- Young children put things in their mouths (paint chips, soil); lead **tastes sweet**. 
+- E.g. Roman sweetener/preservative *sapa* aka *defrutum*: concentrated grape juice boiled in lead vessels
+
+## Didn't we get rid of all the lead? 
+
+### We largely stopped *adding* lead, but much remains in place.
+
+### Leaded gasoline
+- Responsible for the overwhelming majority of lead exposure during 20th century
+- Phased out for cars between 1973 and 1995 in US; still used for small planes 
+- Soil near major roads remains contaminated.
+
+### Lead paint
+- Ubiquitous in first half of 20th century; US ban for residential use in 1978 
+- Likely the main exposure source today, after phaseout of leaded gasoline
+- HUD estimate: 20% of US homes with small children still have lead paint
+- Ingested, or inhaled in form of dust (EPA requirements for renovations)
+
+### Lead pipes
+- It's complicated...
+
+## Lead pipes: it's complicated
+
+### Past, Present & Future of Lead Service Lines 
+- US banned lead service lines in 1986; EPA estimates 6 million remain today.
+- Locations of lead service lines often unknown: statistical modeling.
+- Chicago: greatest number of lead service lines of any city in the US (400,000 est.)
+- Illinois: plans to replace remaining lead service lines over 50 years.
+
+### It depends on the water
+- **Scale**: plaque on inside of pipes that prevents lead from leaching into water.
+- Water hardness (mineral content) tends to increase development of scale.
+- Phosphates can be added to artificially create scale: compounds bind to lead.
+- U-shaped relationship: water pH and lead solubility
+- (pH $6 \uparrow 7$) $\implies$ (water-lead $\downarrow$) 50 to 90\%, depending on above. 
+
+### DC 2002; Flint Michigan 2014 
+- Changes in water sources/treatment $\implies$ sudden corrosion of protective plaque.
+- High levels of lead flush into the water supply (need to test at the tap)
+
+## Measuring Lead Exposure in the US 
+
+### Blood Lead Levels (BLLs)
+- BLLs, either venous or capillary (finger prick), proxy for lead exposure.
+- Measured in micrograms per decliter ($\mu$g/dl)
+- Best we can do, but not ideal: 
+  - Half life of lead in blood $\approx 36$ days: "instantaneous" versus cumulative exposure
+  - Venous tests are more accurate, but still noisy: measurement error
+
+### Screening
+- National Health and Nutrition Evaluation Survey (NHANES): venous BLLs, representative cross-section
+- Various screening programs run by the states
+- Federal guidelines mandate screening of all children on Medicaid at ages 1 and 2. 
+- Some states have *de jure* universal screening; others have targeted screening
+  - IL Dept.\ of Public Health designates zip codes as "high risk" based on housing age and \% of children below 200\% of poverty line.
+  
+## Targeted Screening in Illinois: 2010-2014 Birth Cohorts
+
+:::: {.columns}
+
+::: {.column width="40%"}
+### High and low-risk zips
+![](../img/map-high-risk.jpg)
+:::
+
+::: {.column width="60%"}
+### Screening compliance in high-risk zips
+![](../img/hist-screening-rates-high-risk.jpeg)
+:::
+
+::::
+
+
+## Blood Lead Levels (BLLs): how high is too high? 
+
+- 1991-2012 CDC considered BLL $\geq 10$ *elevated*; since 2012 BLL $\geq 5$
+- Essentially arbitrary: 97.5\%-tile, most children no longer exposed to lead 
+- "No safe level of lead" but "the dose makes the poison" and BLLs have declined
+- Clear **symptoms** of lead poisoning (anemia) and acute harm: BLL $\geq$ 40 $\mu$g/dl
+- Permanent damage at levels too low to observe symptoms, e.g. lower IQ. 
+
+### Policy Questions
+1. Which children are still exposed to lead?
+2. How harmful are **current exposure levels**? 
+3. Should we further reduce lead exposure? 
+4. Effective/cost-effective interventions? 
+
+<!--- But how low and how important? Important empirical question and hard to answer (refer to literature in a moment) 
+- What kinds of treatments / interventions? (Nutrition, visit the home and try to remove the lead, urgent chemical chelation for very high BLLs.) Address this below when talking about some literature.-->
+
+## Why should economists think about lead? 
+
+### Methodology 
+- What are the causal effects of low levels of lead exposure?
+- What are the causal effects of interventions to help lead-exposed children?
+- Endogeneity and measurement error; these are in our wheelhouse as economists.
+
+### People make decisions 
+- Why do some families show up for screening while other don't?
+- Can we improve screening take-up among high-risk children? 
+
+### Cost/Benefit Analysis
+- Public health researchers: "our policy goal should be zero lead."
+- Economists: "keep doing something as long as the benefits exceed the costs" 
+
+
+<!-- If selection on observables is outlawed, etc.
+- Also talking about trying to get screening in the UK and trying to link it to outcomes. Using US data, thinking about some possible avenues for causal identification with WWII bombing etc.
+-->
+
+## What have economists contributed to the literature on lead? 
+
+<!--### Ferrie, Rolf & Troesken (2012)-->
+
+### Aizer & Currie (2018; AEJ Applied)
+**Lower BLLs explain 75% of decline in school suspensions from 1994-2015 in RI**
+
+- Individual-level BLLs linked to school disciplinary records in RI
+- Sibing fixed effects and IV strategies
+- Measurement error biases OLS but omitted variables appears less important
+
+### Aizer, Currie, Simon & Vivier (2019; ReStat)
+**Low levels of lead (BLL $\leq$ 5) have a discernible negative affect on test scores.**
+
+- Individual-level BLLs linked to 3rd-grade test scores for children from Rhode Island
+- Census tract fixed effects; control for avg.\ test scores child's school & grade
+- Two IV strategies; one exploiting multiple lead tests for majority of children.
+- Measurement error attenuates the effect of lead.
+
+## What have economists contributed to the literature on lead? 
+
+
+### Groenqvist, Nilsson & Robling (2020; JPE)
+**Long-term effects on human capital and crime from low doses of lead**
+
+- Sweden: leaded gasoline was *only* source of lead exposure; moss absorbs lead
+- Difference-in-differences event study model: phaseout of leaded gas only affects neighborhoods with high pre-reform exposure (high traffic / closer to roads)
+- Effects mainly operate through effects on non-cognitive skills 
+
+### Billings & Schnepel (2018; AEJ Applied)
+**Early interventions largely reverse negative effects for lead-exposed children**
+
+- Two BLL measurements $\geq 10$ trigger policy intervention in NC: nutritional, home inspection, lead remediation
+- Measurement error creates something akin to an RD design: restrict attention to children whose first BLL measurement is $\geq 10$ 
+- Significant ITTs for antosocial behavior, primary & middle school performance
+
+
+
+# Hidden Hazards & Screening Policy: Predicting Undetected Lead Exposure in Illinois (with Abbasi, Pals and **Gazze**)
+
+## How should IL target lead screening?
+
+### Build novel dataset
+- Link lead tests to geocoded birth records for IL children born from 2010 to 2014
+- Merge with spatial characteristics that predict lead exposure: housing age, proximity to major roads, industrial lead emissions, etc.
+
+### Impute missing BLLs
+- Rich set of individual and spatial controls, including all variables used to target.
+- Selection observables (into testing) is plausible here 
+- Flexible machine learning models, tuned/evaluated with novel policy-relevant loss.
+
+### Policy Experiments
+- How many children with elevated BLLs are missed by current screening?
+- Can we reliably identify children who *shouldn't* be screened? 
+- Can we improve on the "high risk" zip code designations for IL?
+- How best to target screening at the individual level?
+
+## If selection-on-observables is outlawed...
+
+- Not completely airtight, but we go much further than existing work 
+- Policy discussions of targeted vs universal screening often assume BLLs *missing completely at random*, i.e. BLLs of tested and untested are equal on average.
+
+## Novel Policy-relevant Loss for Model Tuning/Evaluation
+
+### Naive Approach 
+- Classification model to predict *elevated* BLLs: $1(\text{BLL}\geq 5)$ or 10.
+- How to weigh false positive against false negatives?
+- Is a BLL of 4.5 that you classify as "elevated" really a false positive?
+- Much worse to classify a BLL of 20 as "not elevated" than a BLL of 5.5
+- Cutoff of 5 or 10 is essentially arbitrary; why not 7?
+
+### Our Approach
+- We prefer to identify children with higher BLL before those with lower BLLs.
+- Score BLLs based on the *harms* they cause in dollars: *averted cost* 
+- Targeting function $r(X_i)$: ranks children based on observed covariates $X_i$.
+- If you plan to screen $n$ children, choose those with highest $r(X_i)$.
+- Evaluate $r(\cdot)$ by comparing its *total* averted cost to infeasible optimum that perfectly ranks children from highest to lowest BLL.
+- Develop cost-weighted targeting efficiency (CWTE) for tuning and evaluation. 
+
+## Some Key Results 
+:::: {.columns}
+
+::: {.column width="50%"}
+![](../img/risk-scores-tested-vs-untested.jpeg)
+:::
+
+::: {.column width="50%"}
+![](../img/iq-cost-by-official-risk-overall.jpeg)
+:::
+
+::::
+
+- The untested are, on average, higher risk than the tested: targeting works
+- Estimate 6600 missed cases relative to 18,000 detected cases
+- Over 80% of missed cases *should have been tested* under status quo: high risk
+- Model-based targeted screening superior to status quo and "universal" screening 
+
+
+# Ongoing and Future Work
+
+
+
+## Nature Review Article
+- Retrospective: 20 years after leaded gasoline (with Ludovica Gazze et al.) 
+- Remaining global lead exposure; data gaps; back-of-the-envelope economic costs
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](../img/frac5plus.png)
+:::
+
+::: {.column width="50%"}
+![](../img/frac10plus.png)
+:::
+
+::::
+
+## What is the situation in the UK specifically?
+
+### 2018 National Screening Committee Report
+
+>The volume, quality, and direction of evidence published since 2012 does not indicate that screening for elevated BLLs should be recommended in the UK. Several uncertainties remain across key criteria including: lack of evidence that elevated BLLs in children is an important health problem in terms of UK prevalence.
+
+
+### 2019 Lead Exposure in Children Surveillance System Report
+
+> There are no recent comprehensive survey data estimating how many children in England are exposed to lead.
+
+### 2021 Public Health England (now HSA)
+Public health intervention level for lead halved from 10 to 5$\mu$g/dl.
+
+##
+
+![](../img/UK-vs-US-housing-age.png)
+
+## How serious is lead exposure in the UK? 
+
+### ALSPAC Cohort Data
+- High quality BLL data, but small samples and from the 1990s in Bristol only
+- Just gained access; merged with housing age, distance to roads, pollution etc. 
+
+### Lead Exposure in Children Surveillance Study 
+- Scanty, and heavily self-selected but only recent BLL data across the UK
+
+### State-Level US Data
+- FOI: zip-level share tested & fraction elevated for 30 states over 10 years
+- Merged with the usual predictors of exposure & demographics  
+- No individual data, so need a different solution to selection-into-testing (dist to provider? medicaid expansion?)
+
+### Combine/model these data sources to get a better approximation of BLLs; Eventual goal: primary data collection on BLLs, exposure sources & outcomes 
