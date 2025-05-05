@@ -232,7 +232,7 @@ IL Dept.\ of Public Health designates zip codes as "high risk" based on housing 
 
 ### Our Approach
 
--   We prefer to identify children with higher BLL before those with lower BLLs.
+-   Prefer to identify children with higher BLL before those with lower BLLs.
 -   Score BLLs based on the *harms* they cause in dollars: *averted cost*
 -   Targeting function $r(X_i)$: ranks children based on observed covariates $X_i$.
 -   If you plan to screen $n$ children, choose those with highest $r(X_i)$.
@@ -256,9 +256,9 @@ IL Dept.\ of Public Health designates zip codes as "high risk" based on housing 
 -   Over 80% of missed cases *should have been tested* under status quo: high risk
 -   Model-based targeted screening superior to status quo and "universal" screening
 
-# Environmental Lead in the 21st Century 
+# 3. Environmental Lead in the 21st Century 
 
-## 3. Environmental Lead in the 21st Century 
+## Environmental Lead in the 21st Century 
 
 
 ::::: columns
@@ -370,42 +370,15 @@ Baseline survey & census: choose probs of sending each household a kit (2000 to 
 35 GBP for returned sample / midline survey; 10 GBP for experience survey
 
 
-## Stratified Sampling
+## Phase II: Collecting Blood Samples 
 
-::::: columns
-::: {.column width="40%"}
-### Budget
+### Research Questions
 
-Send outreach letters to $\approx 40\%$ of residential addresses in Leeds.
-
-### Simple Random Sample
-
-Choose 40% of addresses at random, without replacement.
-
-### Stratified Random Sample
-
-More letters to LSOAs where more households have kids (census)
-:::
-
-::: {.column width="60%"}
-![](../img/eligible_households.png)
-:::
-:::::
-
-### Adaptive Sampling?
-
-Considering sending 20% of letters initially, modeling the response rates based on LSOA & respondent characteristics and adjusting the sampling scheme for the remaining 80%
-
-## Randomized Test Kits
-
--   We have the opportunity to randomize the test kits
--   Considered a toy for kids, but hard to find something:
-    -   age-appropriate (6 months to 6 year!)
-    -   not choking hazard
-    -   fits in flat pack
--   Considering stickers instead. Potentially randomize delayed reward / surprise?
-    -   Stickers in envelope to be opened afterwards?
--   Other ideas?
+- Who returns the blood test kits?
+- What fraction of returned kits are a usable sample?
+- What are the BLLs of the returned kits?
+- Randomized controlled trial: vary the contents of the kit
+- Survey: barriers to participation, experience with the kit, etc.
 
 ## Thanks for listening!
 
