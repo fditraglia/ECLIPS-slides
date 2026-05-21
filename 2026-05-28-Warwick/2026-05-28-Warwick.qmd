@@ -1,0 +1,163 @@
+---
+title: "ECLIPS Internal Workshop 2"
+author: "Frank DiTraglia & Ludovica Gazze"
+institute: "Preliminary Results"
+format: 
+  beamer:
+    aspectratio: 169
+    theme: default
+    header-includes: |
+      \setbeamertemplate{footline}{\hfill\insertframenumber\,/\,\inserttotalframenumber\hspace{2em}\vspace{1ex}} 
+      \usepackage{tikz}
+      \usetikzlibrary{positioning}
+      \usetikzlibrary{arrows}
+      \usetikzlibrary{shapes}
+      \usetikzlibrary{arrows.meta}
+---
+
+## Phase I: Recruiting / Study Participation Decision 
+
+**Clean up this flowchart: turn it into a Frank/Ludovica birds-eye view of Phase I and Phase II. Then "zoom in" on specific parts and fill in details. Could be more like Angela's flowchart initial boxes. E.g. addresses, letters, randomization, re-balancing, dust kits,feedback**
+
+\centering
+  \begin{tikzpicture}[scale=0.5]
+  \node (households) [draw,align=center] {All Leeds Residential Addresses \\ $\approx 373,000$};
+  \node (letters) [draw, below of=households, node distance=2cm,align=center] {Send 200,000 Letters};  
+  \node (ineligible) [draw, dashed, below left of=letters, align=center, node distance = 2.5cm] {$\approx180,000$ \\ Ineligible};  
+  \node (eligible) [draw, below right of=letters, align=center, node distance = 2.5cm] {$\approx 20,000$ \\ Eligible};  
+  \node (respond) [draw, below right of=eligible, align=center, node distance=2.5cm] {$\approx 2000$ \\ Baseline Surveys};  
+  \node (nonrespond) [draw, dashed, below left of=eligible, align=center, node distance=2.5cm] {No Response \\ $\approx 18,000$};  
+
+  \draw[->] (households) -- (letters) node[midway, right]{Randomly Sample Addresses};
+  \draw[->, dashed] (letters) -- (ineligible);
+  \draw[->] (letters) -- (eligible) node[midway, right]{$10\%$ with Young Children};
+  \draw[->] (eligible) -- (respond) node[midway, right]{$10\%$ Response };
+  \draw[->, dashed] (eligible) -- (nonrespond);
+\end{tikzpicture}
+
+5 GBP gift card for sign-up and baseline survey completion
+
+
+## Research Question 1: who responds and why?
+
+- Demographic characteristics (don't observe at the individual level but do observe at LSOA)
+- Design of recruiting materials
+
+# Design
+
+## Sampling Design
+
+- What is our sampling frame? What kinds of exclusion criteria? (removed student residences, hotels, commerical blah blah)
+- What external data sources did we use? (Census, EPCs, Leeds Council Tax, Postal Codes)
+- How / why did we stratify and what did we stratify on? Estimate share eligible (child 1 to 6; how we approximated it)
+- Also stratify by housing age and LSOA (say how many LSOAs)
+
+## Map of where we sent letters
+
+- Map of where we sent letters for both rounds; possibly next to or alongside a plot of the estimated share eligible across LSOAs.
+
+## Describe the treatments
+- This slide gives the text and the motivation
+- One treatment is only for old houses
+- Deifnition of old house
+
+## Show the different recruiting letters
+- This slide shows images (or put on prev slide if it fits)
+
+## Re-balancing / Kit Allocation
+- Recruiting phase is to find people who will get kits
+- Intentionally recruit more people than kits so we can re-balance
+- Why re-balance? We expect that response related to demographic characteristics and lead exposure is too but in opposite directions
+- How we re-balanced and how we assigned kits: another RCT here with two kit types.
+- Could just say what the totals were for each round without explaining the results in detail. 
+- (For the moment don't talk about the two round aspect; that comes next)
+
+## Map of where we sent kits?
+
+- Haven't looked at this yet; might look quite different because of re-balancing
+
+## Adaptive Design
+
+- Everything above is correct but doesn't explain how we broke Phase I (Intake) into two rounds
+- 150k total letters of which 30k in round 1 and adaptive round 2
+- Explain how / why we did this adaptively and our pre-registered rule
+- Explain how the re-balancing interacted with the two-stage process
+
+# Results
+
+## Description of outcomes
+- Define "response" as response within 45 days of sending letter
+- Define "usable" response as: GP, valid other stuff... (check this)
+- (Is there anything else? Maybe; if so add here)
+
+# Basic Results
+- How many usable responses did we get? Overall / (stable by round) / by treatment / by age of house
+- This is not a set of regressions (per se) it's just raw shares by cell (treatment / kind of house / histogram or map by LSOA)
+- Could compare against our protocol where we predicted response rates based on similar studies; could talk about the per participant cost of recruiting in this way (need the total letter cost)
+
+## More results: heterogeneity etc
+
+- Frank did a bunch of crazy stuff! 
+- Various regressions; can we show them graphically? (Probably yes: use a map)
+- Can we show regressions? (Yes we can!)
+- Index of multiple deprivation is particularly interesting here but it's actually *not* a census characteristic. Should point out where we got it from.
+
+## Non-usable results
+- Are there any treatment effects for *clicking on the survey* or *starting the survey* even if you don't finish?
+- Does this vary with anything we can observe? Treatment / housing age etc?
+- This will require Frank to check with Caner; something is weird about the updated anonymized data: doesn't seem to have removed any of the "testing" rows
+
+## Survey 
+
+- Perhaps start with some basic descriptives from the survey
+- Would be nice to say something like: based on census data (and where we sent letters) we would expect: the overall sample / this MSOA to have such and such shares of different kinds of people 
+- In the sample we actually had: give characteristics. 
+- Intake survey: did people know about lead already? Are we getting people who already knew all about lead or people who didn't know much about lead in advance?
+
+
+## Phase II: Collecting Blood Samples 
+
+Baseline survey & census: choose probs of sending each household a kit (2000 to 500)
+
+\centering
+\begin{tikzpicture}[scale=0.4]
+   \node (kits) [draw, align = center]{Send 500 Blood Test Kits \\ and Midline Surveys};
+   \node (pack) [draw, below right of=kits, align = center, node distance = 2.5cm]{Control\\ 250 Kits};
+   \node(nopack)[draw, below left of =kits, align = center, node distance = 2.5cm]{Treatment \\ 250 Kits};
+   \draw[->] (kits) -- (pack) node[midway, right]{Randomize Kits};
+   \draw[->] (kits) -- (nopack);
+   \node (blood) [draw, below left of=pack,align = center, node distance = 2.5cm]{$\approx 70$ Returned Kits \\ \& Midline Surveys};
+   \node (nobloodnopack) [draw, dashed, below left of=nopack, node distance = 2.5cm, align = center]{No \\ Response};
+   \node (nobloodpack) [draw, dashed, below right of=pack, node distance = 2.5cm, align = center]{No \\ Response};
+   \draw[->] (nopack) -- (blood); 
+   \draw[->] (pack) -- (blood) node[midway, right]{14\% Response};
+   \node (experience) [draw, below of=blood, align = center, node distance = 1.5cm]{Send 200 Experience Surveys};
+   \draw[->, dashed] (nopack) -- (nobloodnopack); 
+   \draw[->, dashed] (pack) -- (nobloodpack);
+   \draw[->, dashed] (nobloodnopack) -- (experience);
+   \draw[->, dashed] (nobloodpack) -- (experience);
+   \draw[->] (blood) -- (experience);
+\end{tikzpicture}
+
+35 GBP for returned sample / midline survey; 10 GBP for experience survey
+
+
+## Who returns a blood sample?
+- Needs to be put into the repo in the anonymized form and merged.
+- Talk to Andrea about this today! 
+- Consider adding some very preliminary results about who sends back a kit (valid kit?)
+- Could look at this by kit type; could correlate with demographics / knowledge about lead etc. These need to be re-weighted so they're slightly trickier. Use the re-balancing weights.
+
+## Who returns the exposure survey?
+
+- Ask Andrea about this; she has sent the vouchers for this so we can probably modify her existing code to do this; should already be anonymized and ready-to-use? 
+- Can correlate this with the same things as returning a blood sample: kit type, demographics, knowledge about lead, etc.
+
+## Feedback survey
+ 
+- It was opened a few days ago we think? Ask Andrea
+- Perhaps we could present some very preliminary results?
+
+
+
+
