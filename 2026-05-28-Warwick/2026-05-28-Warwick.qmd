@@ -644,15 +644,15 @@ addr_imd |>
   theme(legend.position = "bottom")
 ```
 
-## A puzzle to revisit
+## A puzzle, resolved
 
 - Old houses respond **more** than New / Unknown.
 - Old houses are **concentrated in the most-deprived areas**.
 - Yet the most-deprived areas respond **less**.
 
-\vspace{1em}
+\vspace{0.8em}
 
-\alert{How can all three be true at once? We come back to this.}
+\alert{Why:} deprivation lowers response *within every house type* (Old: 14.5 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.0$ vs.\ the headline $-2.1$ per 1,000).
 
 ## Heterogeneity: does the gradient differ by treatment? (Old)
 
