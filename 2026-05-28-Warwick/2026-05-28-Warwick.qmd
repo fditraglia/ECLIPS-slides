@@ -644,31 +644,15 @@ addr_imd |>
   theme(legend.position = "bottom")
 ```
 
-## Heterogeneity: the gradient is an Old-house story
+## A puzzle to revisit
 
-```{r}
-#| label: imd-by-age
-#| fig-width: 7.5
-#| fig-height: 3.5
-imd_summary(imd_cells, "age_grp") |>
-  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
-  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.25)) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
-                                 "Unknown" = "#7A7A7A")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Usable per 1,000", colour = NULL, caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
-```
+- Old houses respond **more** than New / Unknown.
+- Old houses are **concentrated in the most-deprived areas**.
+- Yet the most-deprived areas respond **less**.
 
-::: notes
-- IMD = Index of Multiple Deprivation; NOT a 2021 Census variable — say where it came from (LSOA reference table).
-:::
+\vspace{1em}
+
+\alert{How can all three be true at once? We come back to this.}
 
 ## Heterogeneity: does the gradient differ by treatment? (Old)
 
