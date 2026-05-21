@@ -109,6 +109,54 @@ cell_table <- mailed_per_cell |>
          cell = factor(cell, levels = cell_levels)) |>
   arrange(cell)
 
+# --- IMD (deprivation) gradient: usable rate by IMD quintile ---
+# imd_score higher = more deprived; quintiles cut on the mailed-address distribution.
+lsoa_imd <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
+                     show_col_types = FALSE) |>
+  select(lsoa = lsoa21cd, imd_score)
+
+# age_grp splits the design's Non-Old into New (known >= 1967) vs Unknown (no EPC).
+addr_imd <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
+                     show_col_types = FALSE) |>
+  mutate(age_grp = case_when(house_type == "Old"                   ~ "Old",
+                             !is.na(age_end) & age_end > 1966       ~ "New",
+                             TRUE                                   ~ "Unknown")) |>
+  select(lsoa, treatment, age_grp) |>
+  left_join(lsoa_imd, by = "lsoa")
+
+imd_breaks <- quantile(addr_imd$imd_score, probs = seq(0, 1, 0.2), na.rm = TRUE)
+bin_imd <- function(x) cut(x, imd_breaks, include.lowest = TRUE,
+                           labels = c("Q1\nleast", "Q2", "Q3", "Q4", "Q5\nmost"))
+
+imd_cells <- addr_imd |>
+  mutate(q = bin_imd(imd_score)) |>
+  filter(!is.na(q)) |>
+  count(q, age_grp, treatment, name = "mailed") |>
+  left_join(
+    raw |>
+      mutate(age_grp = recode(age_status, "Known Non-Old" = "New",
+                              "Unknown Age" = "Unknown")) |>
+      select(lsoa, treatment = treatment_parsed, age_grp, usable) |>
+      left_join(lsoa_imd, by = "lsoa") |>
+      mutate(q = bin_imd(imd_score)) |>
+      filter(!is.na(q)) |>
+      group_by(q, age_grp, treatment) |>
+      summarise(usable = sum(usable), clicks = n(), .groups = "drop"),
+    by = c("q", "age_grp", "treatment")
+  ) |>
+  mutate(across(c(usable, clicks), \(x) replace_na(x, 0L)))
+
+# rate per 1,000 + Wilson CI for an IMD-quintile grouping; outcome = usable or clicks.
+imd_summary <- function(df, extra = character(0), outcome = "usable") {
+  df |>
+    group_by(across(all_of(c("q", extra)))) |>
+    summarise(mailed = sum(mailed), num = sum(.data[[outcome]]), .groups = "drop") |>
+    rowwise() |>
+    mutate(ci = list(score_ci(num, mailed, cl = ci_level))) |>
+    ungroup() |>
+    mutate(rate = map_dbl(ci, "est"), lo = map_dbl(ci, "lo"), hi = map_dbl(ci, "hi"))
+}
+
 # Horizontal count bar chart for a (factor) survey variable; first level on top.
 # True NAs (item-nonresponse) are folded into "Rather not say".
 plot_bar <- function(var, base = 12) {
@@ -391,16 +439,9 @@ ggplot(age_tab, aes(x = per_1000, y = age_grp, colour = treatment)) +
 
 
 
-## Heterogeneity: Intake Survey
+## Treatment affects *starting* the survey.
 
-- Frank did a bunch of crazy stuff! 
-- Various regressions; can we show them graphically? (Probably yes: use a map)
-- Can we show regressions? (Yes we can!)
-- Index of multiple deprivation is particularly interesting here but it's actually *not* a census characteristic. Should point out where we got it from.
-
-## Treatment affects *starting* the survey. 
-
-\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+\small \textcolor{red}{\emph{Preliminary --- revisit after removing test rows.}}
 
 ```{r}
 #| label: click-rate-forest
@@ -442,7 +483,7 @@ cell_table |>
 
 ## Treatment effects *starting* the survey. 
 
-\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+\small \textcolor{red}{\emph{Preliminary --- revisit after removing test-rows.}}
 
 ```{r}
 #| label: click-diff-forest
@@ -487,7 +528,59 @@ tibble(
         plot.caption = element_text(size = 9, colour = "grey40"))
 ```
 
-\small Generalized-risk text (in G, and in P which also carries it) is associated with more clicking; both intervals exclude zero.
+
+## Clicking: deprivation gradient by housing age
+
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+
+```{r}
+#| label: click-imd-by-age
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
+  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
+  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
+                  position = position_dodge(0.25)) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+                                 "Unknown" = "#7A7A7A")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Clicks per 1,000", colour = NULL, caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+## Clicking: does the gradient differ by treatment? (Old)
+
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+
+```{r}
+#| label: click-imd-by-treatment
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_cells |>
+  filter(age_grp == "Old") |>
+  imd_summary("treatment", outcome = "clicks") |>
+  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
+                            P = "Personalized")) |>
+  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
+                  position = position_dodge(0.3)) +
+  scale_colour_manual(values = c("Control" = "#666666",
+                                 "Generalized" = "#3B6E8F",
+                                 "Personalized" = "#B5651D")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Clicks per 1,000", colour = NULL,
+       caption = paste0("Old houses only; ", ci_caption)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
 
 # Intake Survey: Descriptive Statistics
 
@@ -528,6 +621,123 @@ plot_bar("home") + ggtitle("Housing tenure")
 plot_bar("ethnicity") + ggtitle("Ethnicity")
 ```
 
+
+## Old housing concentrates in deprived areas
+
+```{r}
+#| label: stock-composition
+#| fig-width: 7.5
+#| fig-height: 3.6
+addr_imd |>
+  mutate(q = bin_imd(imd_score)) |>
+  filter(!is.na(q)) |>
+  count(q, age_grp) |>
+  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
+  ggplot(aes(x = q, y = n, fill = age_grp)) +
+  geom_col(position = "fill", width = 0.8) +
+  scale_fill_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+                               "Unknown" = "#7A7A7A")) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Share of letters mailed", fill = NULL) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom")
+```
+
+## Heterogeneity: the gradient is an Old-house story
+
+```{r}
+#| label: imd-by-age
+#| fig-width: 7.5
+#| fig-height: 3.5
+imd_summary(imd_cells, "age_grp") |>
+  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
+  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
+                  position = position_dodge(0.25)) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+                                 "Unknown" = "#7A7A7A")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Usable per 1,000", colour = NULL, caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+::: notes
+- IMD = Index of Multiple Deprivation; NOT a 2021 Census variable — say where it came from (LSOA reference table).
+:::
+
+## Heterogeneity: does the gradient differ by treatment? (Old)
+
+```{r}
+#| label: imd-by-treatment
+#| fig-width: 7.5
+#| fig-height: 3.5
+imd_cells |>
+  filter(age_grp == "Old") |>
+  imd_summary("treatment") |>
+  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
+                            P = "Personalized")) |>
+  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
+                  position = position_dodge(0.3)) +
+  scale_colour_manual(values = c("Control" = "#666666",
+                                 "Generalized" = "#3B6E8F",
+                                 "Personalized" = "#B5651D")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Usable per 1,000", colour = NULL,
+       caption = paste0("Old houses only; ", ci_caption)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+## Ecological check: do responders' own traits track the neighbourhood?
+
+```{r}
+#| label: responder-traits-imd
+#| fig-width: 8
+#| fig-height: 3.9
+ind_levels <- c("Low income (≤£25k)", "Renting", "Low education", "Non-White")
+
+raw |>
+  filter(usable) |>
+  left_join(lsoa_imd, by = "lsoa") |>
+  mutate(
+    q = bin_imd(imd_score),
+    `Low income (≤£25k)` = income %in% c("Under £15,000", "£15,000 - £24,999"),
+    `Renting`            = home %in% c("Rented from the council",
+                                       "Rented from a private landlord"),
+    `Low education`      = highest_education %in%
+      c("No formal qualifications", "Education up to age 16 (GCSE or equivalent)"),
+    `Non-White`          = !is.na(ethnicity) & !str_starts(ethnicity, "White")
+  ) |>
+  filter(!is.na(q)) |>
+  select(q, all_of(ind_levels)) |>
+  pivot_longer(-q, names_to = "indicator", values_to = "flag") |>
+  group_by(indicator, q) |>
+  summarise(x = sum(flag, na.rm = TRUE), n = sum(!is.na(flag)), .groups = "drop") |>
+  rowwise() |>
+  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
+  ungroup() |>
+  mutate(pct = map_dbl(ci, "est") / 10,    # score_ci is per-1,000; /10 -> percent
+         lo  = map_dbl(ci, "lo") / 10,
+         hi  = map_dbl(ci, "hi") / 10,
+         indicator = factor(indicator, levels = ind_levels)) |>
+  ggplot(aes(x = q, y = pct, group = 1)) +
+  geom_line(colour = "#3B6E8F", linewidth = 0.5) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), colour = "#3B6E8F", size = 0.3) +
+  facet_wrap(~ indicator, nrow = 1) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "% of responders", caption = ci_caption) +
+  theme_minimal(base_size = 11) +
+  theme(plot.caption = element_text(size = 9, colour = "grey40"))
+```
 
 ## Phase II: Collecting Blood Samples
 
