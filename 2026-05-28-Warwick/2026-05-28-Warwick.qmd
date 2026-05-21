@@ -61,19 +61,13 @@ format:
 - Demographic characteristics (don't observe at the individual level but do observe at LSOA); do they look like the population of Leeds overall? 
 - Can look at this for each kind of response
 
+## Sampling Design: Data 
 
-## Sampling Design
-
-- How / why did we stratify and what did we stratify on? Estimate share eligible (child 1 to 6; how we approximated it)
-- Also stratify by housing age and LSOA (say how many LSOAs)
-
-## Data Sources
+### Data Sources
 - Leeds Council Tax Data: `leeds_council_tax_data.csv` 
 - ONS address data: `ONS_UPRN_NOV_2024_YH.csv` 
 - Energy Performance Certificates (EPC): `EPC_certificates.csv`
 - 2021 Census data at LSOA level 
-
-## Sampling Design
 
 ### Universe: Leeds Council Tax Records
 - 376,205 rows: one per chargeable dwelling
@@ -84,6 +78,8 @@ format:
 - Housing age from EPC (use latest certificate)
 - Census characteristics at LSOA level
 
+## Sampling Design: Exclusion / De-duplication
+
 ### Addresses Excluded 
 - Hotels / student residences: 936
 - Vacant properties: 931
@@ -91,29 +87,34 @@ format:
 - Missing LSOA: 524
 - Missing postcode (after EPC fallback): 3491
 
-### De-deuplication
+### De-duplication
 - After exclusion, 18 UPRNs appear *exactly twice*  
 - These represent errors in the Council Tax data
 - Only affects address; keep first one from each pair
 
-### Final Sampling Frame
-- 370,666 rows:
-  - Address 1-4, postcode, UPRN
-  - OA (2,607), LSOA (488), MSOA (107)
-  - EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
-  - \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
+### Final Sampling Frame: 370,666 rows
+- Address 1-4, postcode, UPRN
+- OA (2,607), LSOA (488), MSOA (107)
+- EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
+- \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
 
-## Stratified Sampling to Improve Precision
+## Stratified Random Sampling to Improve Precision
+
+\alert{How to allocated a total of $N$ letters across LSOAs / housing age?}
 
 ### Eligibility
 - Letters sent to households without a child aged 1-6 are wasted
 - Approximate \# eligible from 2021 Census: 0-4 \& 5-9 bands
-- $E_\ell = $ \# eligible in LSOA $\ell$ / total \# Eligible
-- Send $N \times E_\ell$ letters to LSOA $\ell$
+- $E_\ell =$ (\# Eligible in LSOA $\ell$) / (Total \# Eligible)
+- Send $N \times E_\ell$ letters to LSOA $\ell$ (Hamilton allocation)
 
 
-### LSOA / Housing Age
-- Recall: "personalized" treatment only applies to old homes 
+### Housing Age
+- $O_\ell=$ Share of Old houses in LSOA $\ell$
+- Suppose $N_\ell$ letters will to to LSOA $\ell$ based on eligibility.
+- Send $N_\ell \times O_\ell$ of the $N_\ell$ letters to to Old houses
+- The rest go to NonOld houses (Hamilton allocation) 
+- Randomization: "personalized" treatment only for Old homes 
   - Old stratum: 1/3 control, 1/3 generalized, 1/3 personalized
   - NonOld stratum: 1/2 control, 1/2 generalized
 
@@ -124,21 +125,39 @@ format:
 
 - Map of where we sent letters for both rounds; possibly next to or alongside a plot of the estimated share eligible across LSOAs.
 
-## Describe the treatments
-- This slide gives the text and the motivation
-- One treatment is only for old houses
-- Deifnition of old house
+
+## Randomized Controlled Trial \#1: Recruiting Letter
+
+
+### Generalized Risk (G)
+> The UK Health Security Agency says that lead can be found in things like: Paint on old walls, doors, windowsills, radiators, furniture, toys, and ornaments; Old plumbing, including pipes, tanks, and taps; Some spices brought from other countries; Some traditional medicines and beauty products (like surma or kohl eye makeup); Certain cooking pots (including grey pewter pots) from countries outside the UK and Europe. 
+
+### Personalized Risk (P)
+> We see from local records that your home was built before 1967, so it may have old paint or pipes containing lead. Finding out if your child has come into contact with lead could help protect their health. 
+
+\vspace{1em}
+\alert{Control letter contains neither; Personalized Risk letter contains both}
+
 
 ---
 ![](../img/personalized-risk-letter-2page.png){fig-align="center"}
 
-## Re-balancing / Kit Allocation
-- Recruiting phase is to find people who will get kits
-- Intentionally recruit more people than kits so we can re-balance
-- Why re-balance? We expect that response related to demographic characteristics and lead exposure is too but in opposite directions
-- How we re-balanced and how we assigned kits: another RCT here with two kit types.
-- Could just say what the totals were for each round without explaining the results in detail. 
-- (For the moment don't talk about the two round aspect; that comes next)
+## Kit Allocation 
+
+### Flag as "disadvantaged" if *any* of the following:
+- Low income: $\leq$ £24,999
+- Low education:  "No formal qualifications" or "Education up to age 16"
+- Language: English non-native *and* reading/writing "Quite hard" / "Very hard" 
+  
+### Re-balancing
+- Budgeted for 500 kits and associated lab capacity
+- Expect fewer responses from some groups, so recruit more participants than kits
+- Earmark 50\% of kits for "disadvantaged"; choose randomly among them
+- Allocate remaining kits randomly among not disadvantaged
+
+### Randomize Kit Types
+- **I can't remember what's different about the two kits!**
+- 50-50 random assignment *stratified* by (Letter treatment) $\times$ (Disadvantaged)
 
 ## Map of where we sent kits?
 
