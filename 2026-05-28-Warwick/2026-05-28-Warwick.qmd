@@ -13,9 +13,123 @@ format:
       \usetikzlibrary{arrows}
       \usetikzlibrary{shapes}
       \usetikzlibrary{arrows.meta}
+      \usepackage{booktabs}
 ---
 
-## Phase I: Recruiting / Study Participation Decision 
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      dev = "png", dpi = 300, fig.align = "center")
+
+raw <- read_csv("~/ECLIPS-PAP/data/processed/combined-pseudonymized.csv",
+                show_col_types = FALSE)
+
+# Usable respondents only, with ordinal demographics coded as ordered factors
+# (short display labels for the long survey categories).
+surv <- raw |>
+  filter(usable) |>
+  mutate(
+    prior_lead_knowledge = factor(prior_lead_knowledge,
+      levels = c("Yes", "No", "Not sure")),
+    worried_exposure = factor(worried_exposure,
+      levels = c("Not worried", "A little worried", "Quite worried",
+                 "Very worried", "Not sure", "Rather not say")),
+    income = factor(income,
+      levels = c("Under £15,000", "£15,000 - £24,999", "£25,000 - £34,999",
+                 "£35,000 - £49,999", "£50,000 - £74,999", "£75,000 - £99,999",
+                 "£100,000 - £149,999", "£150,000 and above",
+                 "Not sure", "Rather not say")),
+    highest_education = factor(highest_education,
+      levels = c("No formal qualifications",
+                 "Education up to age 16 (GCSE or equivalent)",
+                 "Education up to age 18 (A-levels, high school diploma, baccalaureate, or equivalent)",
+                 "Post-school qualification (non-degree) - e.g., diplomas, certificates, apprenticeships or other vocational training",
+                 "Undergraduate degree (Bachelor's or equivalent)",
+                 "Postgraduate degree (Master's, PhD or equivalent)",
+                 "Rather not say"),
+      labels = c("No formal quals", "Up to age 16 (GCSE)", "Up to age 18 (A-level)",
+                 "Post-school (non-degree)", "Undergraduate", "Postgraduate",
+                 "Rather not say")),
+    home = factor(home,
+      levels = c("Owned by you (either with a mortgage or outright)",
+                 "Rented from the council", "Rented from a private landlord",
+                 "Living with family or friends", "Other:", "Not sure",
+                 "Rather not say"),
+      labels = c("Owned", "Rented (council)", "Rented (private)",
+                 "With family/friends", "Other", "Not sure", "Rather not say")),
+    ethnicity = factor(ethnicity,
+      levels = c("White (British [English, Welsh, Scottish, Northern Irish], Irish, Gypsy or Irish Traveller, Roma, any other White background)",
+                 "Asian or Asian British (Indian, Pakistani, Bangladeshi, Chinese, any other Asian background)",
+                 "Black, Black British, Caribbean or African (Caribbean, African, any other Black background)",
+                 "Mixed or multiple backgrounds (White and Black Caribbean, White and Black African, White and Asian, any other mixed background)",
+                 "Other (Arab, any other ethnicity)",
+                 "Rather not say"),
+      labels = c("White", "Asian / Asian British", "Black / Black British",
+                 "Mixed", "Other", "Rather not say"))
+  )
+
+# Cell-level usable-response rates (mirrors 2026-04-16 combined analysis §2.3/§3):
+# denominator = letters mailed per cell; rate per 1,000 with Wilson score CI.
+cell_levels <- c("NonOld_C", "NonOld_G", "Old_C", "Old_G", "Old_P")
+ci_level   <- 0.95                                 # CI level used everywhere below
+ci_pct     <- paste0(round(100 * ci_level), "%")   # e.g. "95%"
+ci_caption <- paste0("Bars: ", ci_pct, " Wilson score intervals")
+
+# Point = observed rate (x/n); bounds = Wilson score interval (= prop.test, no cc).
+score_ci <- function(x, n, cl = 0.95) {
+  z <- qnorm(1 - (1 - cl) / 2)
+  p <- x / n
+  ctr  <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
+  half <- (z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))) / (1 + z^2 / n)
+  c(est = 1000 * p, lo = 1000 * (ctr - half), hi = 1000 * (ctr + half))
+}
+
+mailed_per_cell <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
+                            show_col_types = FALSE) |>
+  mutate(cell = paste(house_type, treatment, sep = "_")) |>
+  count(cell, name = "n_mailed")
+
+cell_table <- mailed_per_cell |>
+  left_join(
+    raw |>
+      mutate(cell = paste(house_type_parsed, treatment_parsed, sep = "_")) |>
+      group_by(cell) |>
+      summarise(n_responded = n(), n_usable = sum(usable), .groups = "drop"),
+    by = "cell"
+  ) |>
+  rowwise() |>
+  mutate(ci = list(score_ci(n_usable, n_mailed, cl = ci_level))) |>
+  ungroup() |>
+  mutate(per_1000 = map_dbl(ci, "est"),
+         lo = map_dbl(ci, "lo"),
+         hi = map_dbl(ci, "hi"),
+         cell = factor(cell, levels = cell_levels)) |>
+  arrange(cell)
+
+# Horizontal count bar chart for a (factor) survey variable; first level on top.
+# True NAs (item-nonresponse) are folded into "Rather not say".
+plot_bar <- function(var, base = 12) {
+  f <- surv[[var]]
+  if (!"Rather not say" %in% levels(f)) levels(f) <- c(levels(f), "Rather not say")
+  f[is.na(f)] <- "Rather not say"
+  tibble(val = f) |>
+    count(val, .drop = FALSE) |>
+    filter(n > 0) |>
+    ggplot(aes(x = n, y = fct_rev(val))) +
+    geom_col(fill = "#3B6E8F") +
+    geom_text(aes(label = n), hjust = -0.25, size = 3) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+    labs(x = NULL, y = NULL) +
+    theme_minimal(base_size = base) +
+    theme(panel.grid.major.y = element_blank(),
+          panel.grid.minor = element_blank())
+}
+```
+
+## Phase I: Recruiting / Study Participation Decision
 
 **Make a simplified flowchart: Frank/Ludovica birds-eye view of Phase I and Phase II. Then "zoom in" on specific parts and fill in details. Could be more like Angela's flowchart initial boxes. E.g. addresses, letters, randomization, re-balancing, dust kits, feedback**
 
@@ -61,46 +175,37 @@ format:
 - Demographic characteristics (don't observe at the individual level but do observe at LSOA); do they look like the population of Leeds overall? 
 - Can look at this for each kind of response
 
-## Sampling Design: Data 
 
-### Data Sources
-- Leeds Council Tax Data: `leeds_council_tax_data.csv` 
-- ONS address data: `ONS_UPRN_NOV_2024_YH.csv` 
-- Energy Performance Certificates (EPC): `EPC_certificates.csv`
-- 2021 Census data at LSOA level 
 
-### Universe: Leeds Council Tax Records
+## Sampling Design: Data Sources
+
+### Leeds Council Tax Data: 
+<!--`leeds_council_tax_data.csv`-->
+- Source of residential addresses in Leeds
 - 376,205 rows: one per chargeable dwelling
 - Columns we use: Address 1-4, Unique Property Reference Number (UPRN)
 
-### Merge by UPRN
-- Postcode, OA, LSOA and MSOA from ONS data
-- Housing age from EPC (use latest certificate)
-- Census characteristics at LSOA level
 
-## Sampling Design: Exclusion / De-duplication
+### ONS address data: 
+<!--`ONS_UPRN_NOV_2024_YH.csv`-->
+Merge Postcode, OA, LSOA and MSOA with Council Tax data (by UPRN)
 
-### Addresses Excluded 
-- Hotels / student residences: 936
-- Vacant properties: 931
-- Missing UPRN: 73 
-- Missing LSOA: 524
-- Missing postcode (after EPC fallback): 3491
+### Energy Performance Certificates (EPC): 
+<!--`EPC_certificates.csv`-->
+Merge Housing age (use latest certificate) with Council Tax data (by UPRN)
 
-### De-duplication
-- After exclusion, 18 UPRNs appear *exactly twice*  
-- These represent errors in the Council Tax data
-- Only affects address; keep first one from each pair
+### Census Data (2021) at LSOA level 
+Merge LSOA-level demographics with Council Tax data (by LSOA)
 
-### Final Sampling Frame: 370,666 rows
-- Address 1-4, postcode, UPRN
-- OA (2,607), LSOA (488), MSOA (107)
-- EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
-- \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
+### Exclusion / De-duplication
+See appendix slide for details.
+
+
+
 
 ## Stratified Random Sampling to Improve Precision
 
-\alert{How to allocated a total of $N$ letters across LSOAs / housing age?}
+\alert{How to allocate a total of $N$ letters across LSOAs / housing age?}
 
 ### Eligibility
 - Letters sent to households without a child aged 1-6 are wasted
@@ -111,12 +216,10 @@ format:
 
 ### Housing Age
 - $O_\ell=$ Share of Old houses in LSOA $\ell$
-- Suppose $N_\ell$ letters will to to LSOA $\ell$ based on eligibility.
-- Send $N_\ell \times O_\ell$ of the $N_\ell$ letters to to Old houses
+- Suppose $N_\ell$ letters will go to LSOA $\ell$ based on eligibility.
+- Send $N_\ell \times O_\ell$ of the $N_\ell$ letters go to Old houses
 - The rest go to NonOld houses (Hamilton allocation) 
-- Randomization: "personalized" treatment only for Old homes 
-  - Old stratum: 1/3 control, 1/3 generalized, 1/3 personalized
-  - NonOld stratum: 1/2 control, 1/2 generalized
+
 
 
   
@@ -142,6 +245,13 @@ format:
 ---
 ![](../img/personalized-risk-letter-2page.png){fig-align="center"}
 
+## Randomization of Letter Types
+
+Recall: Randomization: "personalized" treatment only for Old homes 
+
+- Old stratum: 1/3 control, 1/3 generalized, 1/3 personalized
+- NonOld stratum: 1/2 control, 1/2 generalized
+  
 ## Kit Allocation 
 
 ### Flag as "disadvantaged" if *any* of the following:
@@ -167,13 +277,6 @@ format:
 
 ## Adaptive Design
 
-- Everything above is correct but doesn't explain how we broke Phase I (Intake) into two rounds
-- 150k total letters of which 30k in round 1 and adaptive round 2
-- Explain how / why we did this adaptively and our pre-registered rule
-- Explain how the re-balancing interacted with the two-stage process
-
-## Adaptive Design
-
 \alert{Budget for 150k letters and 2k baseline surveys (5 GBP gift card)}
 
 \vspace{1em}
@@ -192,38 +295,241 @@ Send 30k letters; wait 45 days; \# of responses $R_1$ determines letters sent in
 - Same rebalancing rule in each round; selection probabilities are 
   **round-specific** (depends on who responds)
 
+## Realized Allocation 
+
+\alert{Based on the Round 1 Response Rate}
+- Sent 120k letters in Round 2 (150k total)
+- Fewer disadvantaged than kits earmarked for them (all got a kit)
+  - 100 kits in Round 1, 49 disadvantaged 
+  - 400 kits in Round 2, 224 disadvantaged
 
 ## Description of outcomes
 - Define "response" as response within 45 days of sending letter
 - Define "usable" response as: GP, valid other stuff... (check this)
 - How do we define "returning a blood kit"? We don't have a deadline as in the intake survey, but at some point we stop the study! 
 
-## Basic Results: Intake Survey
-- How many usable responses did we get? Overall / (stable by round) / by treatment / by age of house
-- This is not a set of regressions (per se) it's just raw shares by cell (treatment / kind of house / histogram or map by LSOA)
-- Could compare against our protocol where we predicted response rates based on similar studies; could talk about the per participant cost of recruiting in this way (need the total letter cost)
 
-## Heterogeneity: Intake Survey 
+## Usable response rates vary with housing age not treatment. 
+
+```{r}
+#| label: cell-rate-forest
+#| fig-width: 8
+#| fig-height: 3.9
+cell_table |>
+  mutate(
+    house  = if_else(str_starts(as.character(cell), "Old"), "Old", "Non-Old"),
+    letter = recode(str_sub(as.character(cell), start = -1L),
+                    C = "Control", G = "Generalized", P = "Personalized"),
+    label  = factor(paste0(house, ": ", letter),
+                    levels = rev(c("Non-Old: Control", "Non-Old: Generalized",
+                                   "Old: Control", "Old: Generalized",
+                                   "Old: Personalized")))
+  ) |>
+  ggplot(aes(x = per_1000, y = label, colour = house)) +
+  geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.22, linewidth = 0.7) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "Non-Old" = "#3B6E8F")) +
+  labs(x = "Usable responses per 1,000 letters mailed", y = NULL, colour = NULL,
+       caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+
+## Highest response from Old (pre 1967); lowest from Unknown (no EPC) 
+
+```{r}
+#| label: age-status-forest
+#| fig-width: 8
+#| fig-height: 3.6
+age_levels <- c("Old", "New", "Unknown")
+
+age_tab <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
+                    show_col_types = FALSE) |>
+  mutate(age_grp = case_when(
+    house_type == "Old"               ~ "Old",
+    !is.na(age_end) & age_end > 1966  ~ "New",
+    TRUE                              ~ "Unknown")) |>
+  count(age_grp, treatment, name = "mailed") |>
+  left_join(
+    raw |>
+      filter(usable) |>
+      mutate(age_grp = recode(age_status,
+                              "Known Non-Old" = "New", "Unknown Age" = "Unknown")) |>
+      count(age_grp, treatment = treatment_parsed, name = "usable"),
+    by = c("age_grp", "treatment")
+  ) |>
+  rowwise() |>
+  mutate(ci = list(score_ci(usable, mailed, cl = ci_level))) |>
+  ungroup() |>
+  mutate(per_1000 = map_dbl(ci, "est"),
+         lo = map_dbl(ci, "lo"),
+         hi = map_dbl(ci, "hi"),
+         age_grp = factor(age_grp, levels = rev(age_levels)),
+         treatment = recode(treatment, C = "Control", G = "Generalized",
+                            P = "Personalized"),
+         treatment = factor(treatment,
+                            levels = c("Control", "Generalized", "Personalized")))
+
+ggplot(age_tab, aes(x = per_1000, y = age_grp, colour = treatment)) +
+  geom_hline(yintercept = 2.5, linetype = "dashed", colour = "grey55") +
+  geom_errorbarh(aes(xmin = lo, xmax = hi),
+                 position = position_dodge(width = 0.6), height = 0.2, linewidth = 0.6) +
+  geom_point(position = position_dodge(width = 0.6), size = 2.8) +
+  scale_colour_manual(values = c("Control" = "#666666",
+                                 "Generalized" = "#3B6E8F",
+                                 "Personalized" = "#B5651D")) +
+  labs(x = "Usable responses per 1,000 letters mailed", y = NULL, colour = NULL,
+       caption = paste0("dashed line = design Old/Non-Old cut; ", ci_caption)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+
+
+## Heterogeneity: Intake Survey
 
 - Frank did a bunch of crazy stuff! 
 - Various regressions; can we show them graphically? (Probably yes: use a map)
 - Can we show regressions? (Yes we can!)
 - Index of multiple deprivation is particularly interesting here but it's actually *not* a census characteristic. Should point out where we got it from.
 
-## Non-usable Responses: Intake Survey 
-- Are there any treatment effects for *clicking on the survey* or *starting the survey* even if you don't finish?
-- Does this vary with anything we can observe? Treatment / housing age etc?
-- This will require Frank to check with Caner; something is weird about the updated anonymized data: doesn't seem to have removed any of the "testing" rows
+## Treatment affects *starting* the survey. 
 
-## Intake Survey Descriptive Statistics
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
 
-- Perhaps start with some basic descriptives from the survey
-- Would be nice to say something like: based on census data (and where we sent letters) we would expect: the overall sample / this MSOA to have such and such shares of different kinds of people 
-- In the sample we actually had: give characteristics. 
-- Intake survey: did people know about lead already? Are we getting people who already knew all about lead or people who didn't know much about lead in advance?
+```{r}
+#| label: click-rate-forest
+#| fig-width: 8
+#| fig-height: 3.4
+cell_table |>
+  rowwise() |>
+  mutate(ci = list(score_ci(n_responded, n_mailed, cl = ci_level))) |>
+  ungroup() |>
+  mutate(
+    click  = map_dbl(ci, "est"),
+    clo    = map_dbl(ci, "lo"),
+    chi    = map_dbl(ci, "hi"),
+    house  = if_else(str_starts(as.character(cell), "Old"), "Old", "Non-Old"),
+    letter = recode(str_sub(as.character(cell), start = -1L),
+                    C = "Control", G = "Generalized", P = "Personalized"),
+    label  = factor(paste0(house, ": ", letter),
+                    levels = rev(c("Non-Old: Control", "Non-Old: Generalized",
+                                   "Old: Control", "Old: Generalized",
+                                   "Old: Personalized")))
+  ) |>
+  ggplot(aes(x = click, y = label, colour = house)) +
+  geom_errorbarh(aes(xmin = clo, xmax = chi), height = 0.22, linewidth = 0.7) +
+  geom_point(size = 3) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "Non-Old" = "#3B6E8F")) +
+  labs(x = "Any response (clicked / started) per 1,000 letters mailed",
+       y = NULL, colour = NULL, caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+::: notes
+- Outcome here is *any* response (started survey), not usable.
+- Does the click effect vary by housing age / other observables?
+- Numbers will change once test rows are removed (check with Caner).
+:::
+
+## Treatment effects *starting* the survey. 
+
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+
+```{r}
+#| label: click-diff-forest
+#| fig-width: 8
+#| fig-height: 2.8
+library(PropCIs)
+
+diff_ci <- function(x1, n1, x2, n2, cl = ci_level) {
+  d <- diffscoreci(x1, n1, x2, n2, conf.level = cl)
+  c(est = 1000 * (x1 / n1 - x2 / n2),
+    lo  = 1000 * d$conf.int[1], hi = 1000 * d$conf.int[2])
+}
+
+v <- cell_table |> transmute(cell = as.character(cell), n_responded, n_mailed)
+get <- function(c, col) v[[col]][v$cell == c]
+
+tibble(
+  contrast = c("Non-Old:  G − C", "Old:  (G + P) − C"),
+  x1 = c(get("NonOld_G", "n_responded"),
+         get("Old_G", "n_responded") + get("Old_P", "n_responded")),
+  n1 = c(get("NonOld_G", "n_mailed"),
+         get("Old_G", "n_mailed") + get("Old_P", "n_mailed")),
+  x2 = c(get("NonOld_C", "n_responded"), get("Old_C", "n_responded")),
+  n2 = c(get("NonOld_C", "n_mailed"),    get("Old_C", "n_mailed"))
+) |>
+  rowwise() |>
+  mutate(d = list(diff_ci(x1, n1, x2, n2))) |>
+  ungroup() |>
+  mutate(est = map_dbl(d, "est"), lo = map_dbl(d, "lo"), hi = map_dbl(d, "hi"),
+         contrast = factor(contrast, levels = rev(c("Non-Old:  G − C",
+                                                    "Old:  (G + P) − C")))) |>
+  ggplot(aes(x = est, y = contrast)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
+  geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.15, linewidth = 0.8,
+                 colour = "#3B6E8F") +
+  geom_point(size = 3.2, colour = "#3B6E8F") +
+  labs(x = "Difference in clicks per 1,000 letters  (treatment − control)",
+       y = NULL,
+       caption = paste0(ci_pct, " Newcombe score intervals")) +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+\small Generalized-risk text (in G, and in P which also carries it) is associated with more clicking; both intervals exclude zero.
+
+# Intake Survey: Descriptive Statistics
 
 
-## Phase II: Collecting Blood Samples 
+## Intake Survey: Awareness of Lead
+
+\small Usable respondents ($N = 890$); counts shown on bars.
+
+```{r}
+#| label: lead-awareness
+#| layout-ncol: 2
+#| fig-width: 4.6
+#| fig-height: 3.4
+plot_bar("prior_lead_knowledge") + ggtitle("Heard of lead risk before?")
+plot_bar("worried_exposure") + ggtitle("Worried about exposure?")
+```
+
+## Intake Survey: Socioeconomic Profile
+
+
+```{r}
+#| label: ses-profile
+#| layout-ncol: 2
+#| fig-width: 4.9
+#| fig-height: 3.6
+plot_bar("income") + ggtitle("Household income")
+plot_bar("highest_education") + ggtitle("Highest education")
+```
+
+## Intake Survey: Housing \& Ethnicity
+
+```{r}
+#| label: housing-ethnicity
+#| layout-ncol: 2
+#| fig-width: 4.9
+#| fig-height: 3.6
+plot_bar("home") + ggtitle("Housing tenure")
+plot_bar("ethnicity") + ggtitle("Ethnicity")
+```
+
+
+## Phase II: Collecting Blood Samples
 
 **Update numbers in this flowchart; can give current estimate of response rates although still accepting round 2 kits**
 
@@ -277,5 +583,24 @@ Baseline survey & census: choose probs of sending each household a kit (2000 to 
 - E.g. we could try to correct the response rate estimates and we could check to make sure that this wasn't related to LSOA characteristics or we might find out that it is!
 
 
+# Appendix
 
+## Sampling Design: Exclusion / De-duplication
 
+### Addresses Excluded 
+- Hotels / student residences: 936
+- Vacant properties: 931
+- Missing UPRN: 73 
+- Missing LSOA: 524
+- Missing postcode (after EPC fallback): 3491
+
+### De-duplication
+- After exclusion, 18 UPRNs appear *exactly twice*  
+- These represent errors in the Council Tax data
+- Only affects address; keep first one from each pair
+
+### Final Sampling Frame: 370,666 rows
+- Address 1-4, postcode, UPRN
+- OA (2,607), LSOA (488), MSOA (107)
+- EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
+- \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
