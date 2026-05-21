@@ -17,7 +17,22 @@ format:
 
 ## Phase I: Recruiting / Study Participation Decision 
 
-**Clean up this flowchart: turn it into a Frank/Ludovica birds-eye view of Phase I and Phase II. Then "zoom in" on specific parts and fill in details. Could be more like Angela's flowchart initial boxes. E.g. addresses, letters, randomization, re-balancing, dust kits,feedback**
+**Make a simplified flowchart: Frank/Ludovica birds-eye view of Phase I and Phase II. Then "zoom in" on specific parts and fill in details. Could be more like Angela's flowchart initial boxes. E.g. addresses, letters, randomization, re-balancing, dust kits, feedback**
+
+1. Sampling design
+2. Recruitment / Intake (don't mention community pathway in this talk!)
+3. Kit allocation \& Randomization \& Exposure Survey
+
+- *These are the things we will analyze today; later we may look at dust / feedback surveys*
+- Start with super simple 3 blocks flowchart
+- As we progress through the talk give some more detail; possibly show more flowcharts with specifics (or not)
+
+
+---
+
+## Phase I: Recruiting / Study Participation Decision 
+
+**Update this by removing ineligible / eligible and putting actual responses**
 
 \centering
   \begin{tikzpicture}[scale=0.5]
@@ -38,19 +53,66 @@ format:
 5 GBP gift card for sign-up and baseline survey completion
 
 
-## Research Question 1: who responds and why?
+## Research Question: who responds and why?
 
-- Demographic characteristics (don't observe at the individual level but do observe at LSOA)
-- Design of recruiting materials
+- Various kinds of responses: surveys, returning kits, experience surveys etc.
+- Design of recruiting materials: RCT
+- Design of the kits: RCT
+- Demographic characteristics (don't observe at the individual level but do observe at LSOA); do they look like the population of Leeds overall? 
+- Can look at this for each kind of response
 
-# Design
 
 ## Sampling Design
 
-- What is our sampling frame? What kinds of exclusion criteria? (removed student residences, hotels, commerical blah blah)
-- What external data sources did we use? (Census, EPCs, Leeds Council Tax, Postal Codes)
 - How / why did we stratify and what did we stratify on? Estimate share eligible (child 1 to 6; how we approximated it)
 - Also stratify by housing age and LSOA (say how many LSOAs)
+
+## Data Sources
+- Leeds Council Tax Data: `leeds_council_tax_data.csv` 
+- ONS address data: `ONS_UPRN_NOV_2024_YH.csv` 
+- Energy Performance Certificates (EPC): `EPC_certificates.csv`
+- 2021 Census data at LSOA level 
+
+## Sampling Design
+
+### Universe: Leeds Council Tax Records
+- 376,205 rows: one per chargeable dwelling
+- Columns we use: Address 1-4, Unique Property Reference Number (UPRN)
+
+### Merge by UPRN
+- Postcode, OA, LSOA and MSOA from ONS data
+- Housing age from EPC (use latest certificate)
+- Census characteristics at LSOA level
+
+### Addresses Excluded 
+- Hotels / student residences: 936
+- Vacant properties: 931
+- Missing UPRN: 73 
+- Missing LSOA: 524
+- Missing postcode (after EPC fallback): 3491
+
+### De-deuplication
+- After exclusion, 18 UPRNs appear *exactly twice*  
+- These represent errors in the Council Tax data
+- Only affects address; keep first one from each pair
+
+### Final Sampling Frame
+- 370,666 rows:
+  - Address 1-4, postcode, UPRN
+  - OA, LSOA, MSOA
+  - EPC Housing age band: (details)
+  - \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
+
+## Stratified Sampling to Improve Precision
+
+### Eligibility
+- Letters sent to households without a child aged 1-6 are wasted
+- Approximate \# eligible per LSOA using 2021 Census: 
+
+### LSOA / Housing Age
+
+
+  
 
 ## Map of where we sent letters
 
@@ -83,31 +145,30 @@ format:
 - Explain how / why we did this adaptively and our pre-registered rule
 - Explain how the re-balancing interacted with the two-stage process
 
-# Results
 
 ## Description of outcomes
 - Define "response" as response within 45 days of sending letter
 - Define "usable" response as: GP, valid other stuff... (check this)
-- (Is there anything else? Maybe; if so add here)
+- How do we define "returning a blood kit"? We don't have a deadline as in the intake survey, but at some point we stop the study! 
 
-# Basic Results
+## Basic Results: Intake Survey
 - How many usable responses did we get? Overall / (stable by round) / by treatment / by age of house
 - This is not a set of regressions (per se) it's just raw shares by cell (treatment / kind of house / histogram or map by LSOA)
 - Could compare against our protocol where we predicted response rates based on similar studies; could talk about the per participant cost of recruiting in this way (need the total letter cost)
 
-## More results: heterogeneity etc
+## Heterogeneity: Intake Survey 
 
 - Frank did a bunch of crazy stuff! 
 - Various regressions; can we show them graphically? (Probably yes: use a map)
 - Can we show regressions? (Yes we can!)
 - Index of multiple deprivation is particularly interesting here but it's actually *not* a census characteristic. Should point out where we got it from.
 
-## Non-usable results
+## Non-usable Responses: Intake Survey 
 - Are there any treatment effects for *clicking on the survey* or *starting the survey* even if you don't finish?
 - Does this vary with anything we can observe? Treatment / housing age etc?
 - This will require Frank to check with Caner; something is weird about the updated anonymized data: doesn't seem to have removed any of the "testing" rows
 
-## Survey 
+## Intake Survey Descriptive Statistics
 
 - Perhaps start with some basic descriptives from the survey
 - Would be nice to say something like: based on census data (and where we sent letters) we would expect: the overall sample / this MSOA to have such and such shares of different kinds of people 
@@ -116,6 +177,8 @@ format:
 
 
 ## Phase II: Collecting Blood Samples 
+
+**Update numbers in this flowchart; can give current estimate of response rates although still accepting round 2 kits**
 
 Baseline survey & census: choose probs of sending each household a kit (2000 to 500)
 
@@ -146,7 +209,8 @@ Baseline survey & census: choose probs of sending each household a kit (2000 to 
 - Needs to be put into the repo in the anonymized form and merged.
 - Talk to Andrea about this today! 
 - Consider adding some very preliminary results about who sends back a kit (valid kit?)
-- Could look at this by kit type; could correlate with demographics / knowledge about lead etc. These need to be re-weighted so they're slightly trickier. Use the re-balancing weights.
+- Look at this by "golden envelope" treatment 
+- Could also correlate with demographics / knowledge about lead etc. These need to be re-weighted so they're slightly trickier. Use the re-balancing weights.
 
 ## Who returns the exposure survey?
 
@@ -157,6 +221,13 @@ Baseline survey & census: choose probs of sending each household a kit (2000 to 
  
 - It was opened a few days ago we think? Ask Andrea
 - Perhaps we could present some very preliminary results?
+
+
+## Categorizing letters
+- RA is still going through all the letters that were returned
+- Hasn't finished yet
+- We could add a slide here explaining what we plan to do with that information when we get it.
+- E.g. we could try to correct the response rate estimates and we could check to make sure that this wasn't related to LSOA characteristics or we might find out that it is!
 
 
 
