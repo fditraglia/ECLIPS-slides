@@ -99,17 +99,23 @@ format:
 ### Final Sampling Frame
 - 370,666 rows:
   - Address 1-4, postcode, UPRN
-  - OA, LSOA, MSOA
-  - EPC Housing age band: (details)
+  - OA (2,607), LSOA (488), MSOA (107)
+  - EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
   - \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
 
 ## Stratified Sampling to Improve Precision
 
 ### Eligibility
 - Letters sent to households without a child aged 1-6 are wasted
-- Approximate \# eligible per LSOA using 2021 Census: 
+- Approximate \# eligible from 2021 Census: 0-4 \& 5-9 bands
+- $E_\ell = $ \# eligible in LSOA $\ell$ / total \# Eligible
+- Send $N \times E_\ell$ letters to LSOA $\ell$
+
 
 ### LSOA / Housing Age
+- Recall: "personalized" treatment only applies to old homes 
+  - Old stratum: 1/3 control, 1/3 generalized, 1/3 personalized
+  - NonOld stratum: 1/2 control, 1/2 generalized
 
 
   
@@ -123,8 +129,8 @@ format:
 - One treatment is only for old houses
 - Deifnition of old house
 
-## Show the different recruiting letters
-- This slide shows images (or put on prev slide if it fits)
+---
+![](../img/personalized-risk-letter-2page.png){fig-align="center"}
 
 ## Re-balancing / Kit Allocation
 - Recruiting phase is to find people who will get kits
