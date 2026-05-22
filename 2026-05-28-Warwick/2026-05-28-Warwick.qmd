@@ -649,13 +649,10 @@ library(patchwork)
 # England (all LSOAs, including Leeds) vs Leeds alone, on a shared score axis.
 eng   <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE)
 xlims <- range(eng$imd_score)
-qcuts <- quantile(eng$imd_score, c(.2, .4, .6, .8))   # England (national) quintile cuts
 
 dens <- function(df, ttl, fillcol, xlab = NULL) {
   ggplot(df, aes(imd_score)) +
     geom_density(fill = fillcol, colour = NA) +
-    geom_vline(xintercept = qcuts, colour = "grey25", linetype = "dashed",
-               linewidth = 0.3) +
     coord_cartesian(xlim = xlims) +
     labs(title = ttl, x = xlab, y = NULL) +
     theme_minimal(base_size = 12) +
