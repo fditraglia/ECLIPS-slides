@@ -529,61 +529,6 @@ tibble(
 ```
 
 
-## Clicking: deprivation gradient by housing age
-
-\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
-
-```{r}
-#| label: click-imd-by-age
-#| fig-width: 7.5
-#| fig-height: 3.3
-imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
-  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
-  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.25)) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
-                                 "Unknown" = "#7A7A7A")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Clicks per 1,000", colour = NULL, caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
-```
-
-## Clicking: does the gradient differ by treatment? (Old)
-
-\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
-
-```{r}
-#| label: click-imd-by-treatment
-#| fig-width: 7.5
-#| fig-height: 3.3
-imd_cells |>
-  filter(age_grp == "Old") |>
-  imd_summary("treatment", outcome = "clicks") |>
-  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
-                            P = "Personalized")) |>
-  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.3)) +
-  scale_colour_manual(values = c("Control" = "#666666",
-                                 "Generalized" = "#3B6E8F",
-                                 "Personalized" = "#B5651D")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Clicks per 1,000", colour = NULL,
-       caption = paste0("Old houses only; ", ci_caption)) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
-```
-
-# Intake Survey: Descriptive Statistics
-
 
 ## Intake Survey: Awareness of Lead
 
@@ -622,6 +567,76 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 ```
 
 
+## What is the Index of Multiple Deprivation (IMD)?
+
+- Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
+- Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
+- Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
+- Here: cut Leeds LSOAs into **quintiles** by the deprivation of the addresses we mailed (Q1 = least, Q5 = most deprived)
+
+## Deprivation is concentrated in inner-city Leeds
+
+```{r}
+#| label: leeds-imd-map
+#| fig-width: 6.6
+#| fig-height: 4.6
+library(sf)
+
+# Leeds LSOA (2021) boundaries from ONS Open Geography Portal (BGC, generalized
+# clipped; OGL v3). See ../data/leeds-lsoa-2021-bgc-PROVENANCE.md for the source.
+leeds_lsoa <- st_read("../data/leeds-lsoa-2021-bgc.geojson", quiet = TRUE) |>
+  left_join(lsoa_imd, by = c("LSOA21CD" = "lsoa")) |>
+  mutate(quintile = factor(bin_imd(imd_score),
+                           labels = c("Q1 least", "Q2", "Q3", "Q4", "Q5 most")))
+
+ggplot(leeds_lsoa, aes(fill = quintile)) +
+  geom_sf(colour = "white", linewidth = 0.05) +
+  scale_fill_brewer(palette = "YlOrBr", direction = 1, na.value = "grey85",
+                    name = "IMD quintile") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 13) +
+  theme(legend.position = "right")
+```
+
+## Usable response falls with neighbourhood deprivation
+
+```{r}
+#| label: usable-imd-marginal
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_summary(imd_cells) |>
+  ggplot(aes(x = q, y = rate, group = 1)) +
+  geom_line(colour = "#3B6E8F", linewidth = 0.7) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), colour = "#3B6E8F", size = 0.5) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Usable per 1,000", caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+## ... but it is the oldest housing driving it
+
+```{r}
+#| label: usable-imd-by-age
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_summary(imd_cells, "age_grp", outcome = "usable") |>
+  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
+  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
+                  position = position_dodge(0.25)) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+                                 "Unknown" = "#7A7A7A")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Usable per 1,000", colour = NULL, caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
 ## Old housing concentrates in deprived areas
 
 ```{r}
@@ -643,16 +658,6 @@ addr_imd |>
   theme_minimal(base_size = 13) +
   theme(legend.position = "bottom")
 ```
-
-## A puzzle, resolved
-
-- Old houses respond **more** than New / Unknown.
-- Old houses are **concentrated in the most-deprived areas**.
-- Yet the most-deprived areas respond **less**.
-
-\vspace{0.8em}
-
-\alert{Why:} deprivation lowers response *within every house type* (Old: 14.5 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.0$ vs.\ the headline $-2.1$ per 1,000).
 
 ## Heterogeneity: does the gradient differ by treatment? (Old)
 
@@ -721,6 +726,69 @@ raw |>
        y = "% of responders", caption = ci_caption) +
   theme_minimal(base_size = 11) +
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+## A puzzle, resolved
+
+- Old houses respond **more** than New / Unknown.
+- Old houses are **concentrated in the most-deprived areas**.
+- Yet the most-deprived areas respond **less**.
+
+\vspace{0.8em}
+
+\alert{Why:} deprivation lowers response *within every house type* (Old: 14.5 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.0$ vs.\ the headline $-2.1$ per 1,000).
+
+## Clicking: deprivation gradient by housing age
+
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+
+```{r}
+#| label: click-imd-by-age
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
+  mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
+  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
+                  position = position_dodge(0.25)) +
+  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+                                 "Unknown" = "#7A7A7A")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Clicks per 1,000", colour = NULL, caption = ci_caption) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+## Clicking: does the gradient differ by treatment? (Old)
+
+\small \textcolor{red}{\emph{Preliminary --- revisit after test-row correction.}}
+
+```{r}
+#| label: click-imd-by-treatment
+#| fig-width: 7.5
+#| fig-height: 3.3
+imd_cells |>
+  filter(age_grp == "Old") |>
+  imd_summary("treatment", outcome = "clicks") |>
+  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
+                            P = "Personalized")) |>
+  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
+                  position = position_dodge(0.3)) +
+  scale_colour_manual(values = c("Control" = "#666666",
+                                 "Generalized" = "#3B6E8F",
+                                 "Personalized" = "#B5651D")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Clicks per 1,000", colour = NULL,
+       caption = paste0("Old houses only; ", ci_caption)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
 
 ## Phase II: Collecting Blood Samples
