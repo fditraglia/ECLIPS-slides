@@ -157,6 +157,19 @@ imd_summary <- function(df, extra = character(0), outcome = "usable") {
     mutate(rate = map_dbl(ci, "est"), lo = map_dbl(ci, "lo"), hi = map_dbl(ci, "hi"))
 }
 
+# --- Map data: Leeds LSOA (2021) boundaries + per-LSOA quantities ---
+# Boundaries from ONS (BGC, OGL v3); see ../data/leeds-lsoa-2021-bgc-PROVENANCE.md.
+library(sf)
+leeds_geo <- st_read("../data/leeds-lsoa-2021-bgc.geojson", quiet = TRUE)
+
+# Estimated eligible share (E_l, the Hamilton sampling weight) per LSOA.
+lsoa_elig <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
+                      show_col_types = FALSE) |>
+  select(lsoa = lsoa21cd, E_l)
+
+# Letters mailed per LSOA across both rounds (addr_imd = one row per mailed address).
+letters_by_lsoa <- addr_imd |> count(lsoa, name = "n_letters")
+
 # Horizontal count bar chart for a (factor) survey variable; first level on top.
 # True NAs (item-nonresponse) are folded into "Rather not say".
 plot_bar <- function(var, base = 12) {
@@ -272,9 +285,55 @@ See appendix slide for details.
 
   
 
-## Map of where we sent letters
+## Where we sent letters, and why
 
-- Map of where we sent letters for both rounds; possibly next to or alongside a plot of the estimated share eligible across LSOAs.
+```{r}
+#| label: letters-map-and-scatter
+#| layout-ncol: 2
+#| fig-width: 4.6
+#| fig-height: 4.6
+library(patchwork)
+
+# (left) Where letters went: choropleth of letters mailed per LSOA (raw counts).
+leeds_geo |>
+  left_join(letters_by_lsoa, by = c("LSOA21CD" = "lsoa")) |>
+  ggplot(aes(fill = n_letters)) +
+  geom_sf(colour = "white", linewidth = 0.03) +
+  scale_fill_viridis_c(option = "mako", direction = -1, name = "Letters",
+                       na.value = "grey85") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 12) +
+  theme(legend.position = "right", legend.key.width = unit(0.3, "cm"))
+
+# (right) Why: letters per LSOA vs estimated eligible share, with marginals.
+d   <- letters_by_lsoa |> inner_join(lsoa_elig, by = "lsoa")
+col <- "#3B6E8F"
+
+main <- ggplot(d, aes(E_l, n_letters)) +
+  geom_abline(slope = sum(d$n_letters), intercept = 0,
+              linetype = "dashed", colour = "grey55") +
+  geom_point(alpha = 0.45, colour = col, size = 1.1) +
+  labs(x = "Estimated eligible share", y = "Letters mailed") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank())
+
+top   <- ggplot(d, aes(E_l)) +
+  geom_histogram(bins = 40, fill = col, colour = "white", linewidth = 0.1) +
+  theme_void()
+
+right <- ggplot(d, aes(n_letters)) +
+  geom_histogram(bins = 40, fill = col, colour = "white", linewidth = 0.1) +
+  coord_flip() +
+  theme_void()
+
+top + plot_spacer() + main + right +
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
+```
+
+\small Both at LSOA level. Left: letters mailed per LSOA (raw count). Right: each point is one of 488 LSOAs; dashed line is the Hamilton design (letters $\propto E_\ell$).
+
+\small Each point is one of 488 LSOAs; dashed line is the Hamilton design (letters $\propto E_\ell$).
+
 
 
 ## Randomized Controlled Trial \#1: Recruiting Letter
@@ -574,17 +633,42 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 - Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
 - Here: cut Leeds LSOAs into **quintiles** by the deprivation of the addresses we mailed (Q1 = least, Q5 = most deprived)
 
+## Distribution of LSOA deprivation: England vs Leeds
+
+```{r}
+#| label: imd-england-vs-leeds
+#| fig-width: 6.4
+#| fig-height: 4
+#| out-width: 82%
+library(patchwork)
+
+# England (all LSOAs, including Leeds) vs Leeds alone, on a shared score axis.
+eng   <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE)
+xlims <- range(eng$imd_score)
+
+dens <- function(df, ttl, fillcol, xlab = NULL) {
+  ggplot(df, aes(imd_score)) +
+    geom_density(fill = fillcol, colour = NA) +
+    coord_cartesian(xlim = xlims) +
+    labs(title = ttl, x = xlab, y = NULL) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.y = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.title = element_text(size = 12))
+}
+
+dens(eng, "England — 33,755 LSOAs", "grey65") /
+  dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", "#B5651D",
+       xlab = "IMD score  (higher = more deprived)")
+```
+
 ## Deprivation is concentrated in inner-city Leeds
 
 ```{r}
 #| label: leeds-imd-map
 #| fig-width: 6.6
 #| fig-height: 4.6
-library(sf)
-
-# Leeds LSOA (2021) boundaries from ONS Open Geography Portal (BGC, generalized
-# clipped; OGL v3). See ../data/leeds-lsoa-2021-bgc-PROVENANCE.md for the source.
-leeds_lsoa <- st_read("../data/leeds-lsoa-2021-bgc.geojson", quiet = TRUE) |>
+leeds_lsoa <- leeds_geo |>
   left_join(lsoa_imd, by = c("LSOA21CD" = "lsoa")) |>
   mutate(quintile = factor(bin_imd(imd_score),
                            labels = c("Q1 least", "Q2", "Q3", "Q4", "Q5 most")))
