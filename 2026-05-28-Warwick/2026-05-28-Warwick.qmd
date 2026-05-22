@@ -635,20 +635,27 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 
 ## Distribution of LSOA deprivation: England vs Leeds
 
+:::: {.columns}
+
+::: {.column width="56%"}
+
 ```{r}
 #| label: imd-england-vs-leeds
-#| fig-width: 6.4
-#| fig-height: 4
-#| out-width: 82%
+#| fig-width: 4.8
+#| fig-height: 4.8
+#| out-width: 100%
 library(patchwork)
 
 # England (all LSOAs, including Leeds) vs Leeds alone, on a shared score axis.
 eng   <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE)
 xlims <- range(eng$imd_score)
+qcuts <- quantile(eng$imd_score, c(.2, .4, .6, .8))   # England (national) quintile cuts
 
 dens <- function(df, ttl, fillcol, xlab = NULL) {
   ggplot(df, aes(imd_score)) +
     geom_density(fill = fillcol, colour = NA) +
+    geom_vline(xintercept = qcuts, colour = "grey25", linetype = "dashed",
+               linewidth = 0.3) +
     coord_cartesian(xlim = xlims) +
     labs(title = ttl, x = xlab, y = NULL) +
     theme_minimal(base_size = 12) +
@@ -661,6 +668,42 @@ dens(eng, "England — 33,755 LSOAs", "grey65") /
   dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", "#B5651D",
        xlab = "IMD score  (higher = more deprived)")
 ```
+
+:::
+
+::: {.column width="40%"}
+
+\vspace{2em}
+
+\footnotesize
+
+```{r}
+#| label: imd-england-vs-leeds-table
+#| results: asis
+tab <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE) |>
+  mutate(leeds = lsoa %in% lsoa_imd$lsoa, dec = ntile(-imd_score, 10))
+
+fmt <- function(d) c(
+  sprintf("%.1f", median(d$imd_score)),
+  sprintf("%.0f%%", 100 * mean(d$dec == 1)),
+  sprintf("%.0f%%", 100 * mean(d$dec == 10)),
+  sprintf("%.0f%%", 100 * mean(d$dec %in% 4:7)))
+
+tibble(
+  Measure = c("Median IMD score",
+              "Most-deprived decile",
+              "Least-deprived decile",
+              "Middle (deciles 4--7)"),
+  England = fmt(tab),
+  Leeds   = fmt(filter(tab, leeds))
+) |>
+  knitr::kable(format = "latex", booktabs = TRUE, align = "lrr", linesep = "",
+               col.names = c("", "England", "Leeds"))
+```
+
+:::
+
+::::
 
 ## Deprivation is concentrated in inner-city Leeds
 
@@ -708,9 +751,9 @@ imd_summary(imd_cells) |>
 imd_summary(imd_cells, "age_grp", outcome = "usable") |>
   mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
   ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
   geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.25)) +
+                  position = position_dodge(0.12)) +
   scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
                                  "Unknown" = "#7A7A7A")) +
   labs(x = "IMD quintile  (left = least deprived)",
@@ -755,9 +798,9 @@ imd_cells |>
   mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
                             P = "Personalized")) |>
   ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
   geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.3)) +
+                  position = position_dodge(0.12)) +
   scale_colour_manual(values = c("Control" = "#666666",
                                  "Generalized" = "#3B6E8F",
                                  "Personalized" = "#B5651D")) +
@@ -833,9 +876,9 @@ raw |>
 imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
   mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
   ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.25)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
   geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.25)) +
+                  position = position_dodge(0.12)) +
   scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
                                  "Unknown" = "#7A7A7A")) +
   labs(x = "IMD quintile  (left = least deprived)",
@@ -860,9 +903,9 @@ imd_cells |>
   mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
                             P = "Personalized")) |>
   ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.3)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
   geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.3)) +
+                  position = position_dodge(0.12)) +
   scale_colour_manual(values = c("Control" = "#666666",
                                  "Generalized" = "#3B6E8F",
                                  "Personalized" = "#B5651D")) +
