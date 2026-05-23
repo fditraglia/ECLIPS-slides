@@ -110,7 +110,7 @@ cell_table <- mailed_per_cell |>
   arrange(cell)
 
 # --- IMD (deprivation) gradient: usable rate by IMD quintile ---
-# imd_score higher = more deprived; quintiles cut on the mailed-address distribution.
+# imd_score higher = more deprived; quintiles = equal fifths of the 488 Leeds LSOAs.
 lsoa_imd <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
                      show_col_types = FALSE) |>
   select(lsoa = lsoa21cd, imd_score)
@@ -124,7 +124,7 @@ addr_imd <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
   select(lsoa, treatment, age_grp) |>
   left_join(lsoa_imd, by = "lsoa")
 
-imd_breaks <- quantile(addr_imd$imd_score, probs = seq(0, 1, 0.2), na.rm = TRUE)
+imd_breaks <- quantile(lsoa_imd$imd_score, probs = seq(0, 1, 0.2), na.rm = TRUE)
 bin_imd <- function(x) cut(x, imd_breaks, include.lowest = TRUE,
                            labels = c("Q1\nleast", "Q2", "Q3", "Q4", "Q5\nmost"))
 
@@ -330,9 +330,6 @@ top + plot_spacer() + main + right +
   plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
 ```
 
-\small Both at LSOA level. Left: letters mailed per LSOA (raw count). Right: each point is one of 488 LSOAs; dashed line is the Hamilton design (letters $\propto E_\ell$).
-
-\small Each point is one of 488 LSOAs; dashed line is the Hamilton design (letters $\propto E_\ell$).
 
 
 
@@ -631,7 +628,7 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 - Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
 - Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
 - Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
-- Here: cut Leeds LSOAs into **quintiles** by the deprivation of the addresses we mailed (Q1 = least, Q5 = most deprived)
+- Here: rank Leeds LSOAs by deprivation and split into **quintiles** (equal fifths of LSOAs; Q1 = least, Q5 = most deprived)
 
 ## Distribution of LSOA deprivation: England vs Leeds
 
@@ -702,7 +699,7 @@ tibble(
 
 ::::
 
-## Deprivation is concentrated in inner-city Leeds
+## Quintiles of Deprivation in Leeds: by LSOA 
 
 ```{r}
 #| label: leeds-imd-map
@@ -722,7 +719,7 @@ ggplot(leeds_lsoa, aes(fill = quintile)) +
   theme(legend.position = "right")
 ```
 
-## Usable response falls with neighbourhood deprivation
+## Lower response rate in more deprived LSOAs 
 
 ```{r}
 #| label: usable-imd-marginal
@@ -739,7 +736,7 @@ imd_summary(imd_cells) |>
         plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
 
-## ... but it is the oldest housing driving it
+## ... but mainly driven by Old houses
 
 ```{r}
 #| label: usable-imd-by-age
@@ -761,7 +758,7 @@ imd_summary(imd_cells, "age_grp", outcome = "usable") |>
         plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
 
-## Old housing concentrates in deprived areas
+## More Old housing in deprived LSOAs areas
 
 ```{r}
 #| label: stock-composition
@@ -810,7 +807,7 @@ imd_cells |>
         plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
 
-## Ecological check: do responders' own traits track the neighbourhood?
+## Responder demographics versus LSOA deprivation 
 
 ```{r}
 #| label: responder-traits-imd
@@ -860,7 +857,7 @@ raw |>
 
 \vspace{0.8em}
 
-\alert{Why:} deprivation lowers response *within every house type* (Old: 14.5 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.0$ vs.\ the headline $-2.1$ per 1,000).
+\alert{Why:} deprivation lowers response *within every house type* (Old: 14.4 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.6$ vs.\ the headline $-2.1$ per 1,000).
 
 ## Clicking: deprivation gradient by housing age
 
