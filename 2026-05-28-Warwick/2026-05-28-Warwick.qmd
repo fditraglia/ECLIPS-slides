@@ -170,6 +170,22 @@ lsoa_elig <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
 # Letters mailed per LSOA across both rounds (addr_imd = one row per mailed address).
 letters_by_lsoa <- addr_imd |> count(lsoa, name = "n_letters")
 
+# Empirical-Bayes (Beta-Binomial) shrinkage of per-LSOA usable-response rates.
+# y usable of n letters per LSOA; p ~ Beta(a, b) with (a, b) by marginal MLE.
+eb_lsoa <- letters_by_lsoa |>
+  rename(n = n_letters) |>
+  left_join(raw |> filter(usable) |> count(lsoa, name = "y"), by = "lsoa") |>
+  mutate(y = replace_na(y, 0L))
+eb_nll <- function(p) {
+  a <- exp(p[1]); b <- exp(p[2])
+  -sum(lchoose(eb_lsoa$n, eb_lsoa$y) +
+       lbeta(eb_lsoa$y + a, eb_lsoa$n - eb_lsoa$y + b) - lbeta(a, b))
+}
+eb_fit <- optim(c(log(0.3), log(50)), eb_nll)
+eb_a <- exp(eb_fit$par[1]); eb_b <- exp(eb_fit$par[2])
+eb_lsoa <- eb_lsoa |>
+  mutate(raw = 1000 * y / n, post = 1000 * (y + eb_a) / (n + eb_a + eb_b))
+
 # Horizontal count bar chart for a (factor) survey variable; first level on top.
 # True NAs (item-nonresponse) are folded into "Rather not say".
 plot_bar <- function(var, base = 12) {
@@ -858,6 +874,97 @@ raw |>
 \vspace{0.8em}
 
 \alert{Why:} deprivation lowers response *within every house type* (Old: 14.4 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.6$ vs.\ the headline $-2.1$ per 1,000).
+
+## Usable response rate by LSOA: raw
+
+```{r}
+#| label: eb-map-raw
+#| fig-width: 6
+#| fig-height: 4.2
+#| out-width: 62%
+leeds_geo |>
+  left_join(eb_lsoa, by = c("LSOA21CD" = "lsoa")) |>
+  ggplot(aes(fill = raw)) +
+  geom_sf(colour = "white", linewidth = 0.02) +
+  scale_fill_viridis_c(option = "rocket", direction = -1, name = "Usable\nper 1,000") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 13) +
+  theme(legend.position = "right")
+```
+
+\small $y/n$ per LSOA: 0--23 per 1,000, with 117 of 488 LSOAs at zero --- mostly sampling noise.
+
+## Usable response rate by LSOA: empirical-Bayes shrunk
+
+```{r}
+#| label: eb-map-shrunk
+#| fig-width: 6
+#| fig-height: 4.2
+#| out-width: 62%
+leeds_geo |>
+  left_join(eb_lsoa, by = c("LSOA21CD" = "lsoa")) |>
+  ggplot(aes(fill = post)) +
+  geom_sf(colour = "white", linewidth = 0.02) +
+  scale_fill_viridis_c(option = "mako", direction = -1, name = "Usable\nper 1,000") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 13) +
+  theme(legend.position = "right")
+```
+
+\small Posterior means --- *own scale (4--9) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
+
+## Shrinkage of LSOA estimates, and the estimated rate distribution
+
+```{r}
+#| label: eb-shrinkage
+#| fig-width: 7.5
+#| fig-height: 4.3
+#| out-width: 88%
+library(patchwork)
+xmax <- max(eb_lsoa$raw)
+
+funnel <- ggplot(eb_lsoa) +
+  geom_segment(aes(x = raw, xend = post, y = 1, yend = 0),
+               colour = "#3B6E8F", alpha = 0.12, linewidth = 0.2) +
+  geom_point(aes(raw,  1), colour = "#B5651D", size = 0.5, alpha = 0.5) +
+  geom_point(aes(post, 0), colour = "#3B6E8F", size = 0.5, alpha = 0.5) +
+  annotate("text", x = 0, y = 1, label = "raw  y/n", hjust = 0, vjust = -1.1, size = 3.3) +
+  annotate("text", x = 0, y = 0, label = "shrunk",   hjust = 0, vjust = 2.1,  size = 3.3) +
+  scale_x_continuous(limits = c(0, xmax)) +
+  scale_y_continuous(limits = c(-0.4, 1.4), breaks = NULL) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(), axis.text.x = element_blank())
+
+prior <- tibble(rate = seq(0, xmax, length.out = 400)) |>
+  mutate(dens = dbeta(rate / 1000, eb_a, eb_b))
+distp <- ggplot(prior, aes(rate, dens)) +
+  geom_area(fill = "#3B6E8F", alpha = 0.85) +
+  scale_x_continuous(limits = c(0, xmax)) +
+  labs(x = "Usable per 1,000", y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), axis.text.y = element_blank())
+
+funnel / distp + plot_layout(heights = c(1.1, 1))
+```
+
+\small Top: each LSOA's raw rate (upper row) joined to its empirical-Bayes estimate (lower row). Bottom: the fitted Beta prior --- the estimated distribution of true rates.
+
+## A small-area model: Beta-Binomial empirical Bayes (for reference)
+
+For LSOA $\ell$ with $n_\ell$ letters and $y_\ell$ usable responses:
+
+**Model.** $\quad y_\ell \mid p_\ell \sim \text{Binomial}(n_\ell, p_\ell), \qquad p_\ell \sim \text{Beta}(a, b)$ — the shared prior is what lets sparse areas borrow strength.
+
+**Posterior** (conjugate). $\quad p_\ell \mid y_\ell \sim \text{Beta}(y_\ell + a,\ n_\ell - y_\ell + b)$, so
+
+$$\hat p_\ell = \frac{y_\ell + a}{n_\ell + a + b} = w_\ell\,\frac{y_\ell}{n_\ell} + (1 - w_\ell)\,\frac{a}{a + b}, \qquad w_\ell = \frac{n_\ell}{n_\ell + a + b}$$
+
+a precision-weighted blend of the LSOA's own rate and the Leeds average ($a + b$ acts like $\approx$ `r round(eb_a + eb_b, -1)` "pseudo-letters").
+
+**Estimation** (empirical Bayes). Choose $(a, b)$ to maximise the marginal Beta-Binomial likelihood $\;\prod_\ell \int \text{Bin}(y_\ell \mid n_\ell, p)\,\text{Beta}(p \mid a, b)\,dp\;$, then plug in: here $\hat a \approx$ `r round(eb_a)`, $\hat b \approx$ `r round(eb_b)`.
+
+\small The classic small-area / borrowing-strength setup --- the discrete analogue of James--Stein and Fay--Herriot shrinkage.
 
 ## Clicking: deprivation gradient by housing age
 
