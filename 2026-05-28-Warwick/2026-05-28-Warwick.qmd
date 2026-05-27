@@ -258,6 +258,8 @@ One or more usable blood spot on the returned card
 
 ## Sampling Design: Data Sources
 
+\hypertarget{main-datasources}{}
+
 ### Leeds Council Tax Data: 
 <!--`leeds_council_tax_data.csv`-->
 - Source of residential addresses in Leeds
@@ -435,7 +437,8 @@ Send 30k letters; wait 45 days; \# of responses $R_1$ determines letters sent in
 
 # 2 - Recruitment \& Intake Survey Results
 
----
+
+## Phase 1: Outreach \& Intake Survey
 
 \vspace{1em}
 
@@ -660,6 +663,8 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 
 ## Lower response rate in more deprived LSOAs
 
+\hypertarget{main-deprivation}{}
+
 ```{r}
 #| label: usable-imd-marginal
 #| fig-width: 7.5
@@ -682,6 +687,8 @@ imd_summary(imd_cells) |>
 \hyperlink{appx-eb}{\beamergotobutton{Per-LSOA maps \& shrinkage}}
 
 ## ... but mainly driven by Old houses
+
+\hypertarget{main-by-age}{}
 
 ```{r}
 #| label: usable-imd-by-age
@@ -769,6 +776,8 @@ raw |>
   theme_minimal(base_size = 11) +
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
 ```
+
+# 3 - Kit Allocation and Exposure Survey
 
 ## Kit Allocation
 
@@ -907,8 +916,6 @@ bind_rows(
   facet_grid(panel ~ ., scales = "free_y", space = "free_y")
 ```
 
-\footnotesize Overlapping cuts, not independent findings: the *disadvantaged* flag is
-partly built from education and income.
 
 ## The personalized-risk letter lifts kit return too \hfill \small \alert{(Preliminary)} 
 
@@ -940,8 +947,6 @@ bind_rows(
   facet_grid(panel ~ ., scales = "free_y", space = "free_y")
 ```
 
-\footnotesize Self-reported attitudes are flat across the return outcomes:
-stated worry / knowledge does not translate into returning a kit.
 
 ## Kit type does not move completion or return \hfill \small \alert{(Preliminary)}
 
@@ -985,10 +990,6 @@ kit |>
   theme(panel.grid.minor = element_blank(), legend.position = "top")
 ```
 
-\footnotesize *Returned (any)* = blood-spot card came back and was assessed (154);
-*valid spot* = `valid_sample` $\geq 1$ (117). Differences between kit types are well
-within sampling noise (all $p > 0.5$).
-
 
 <!--## Feedback survey
  
@@ -998,10 +999,9 @@ within sampling noise (all $p > 0.5$).
 
 ## Categorizing letters
 
-- RA is still going through all the letters that were returned
-- Hasn't finished yet
-- We could add a slide here explaining what we plan to do with that information when we get it.
-- E.g. we could try to correct the response rate estimates and we could check to make sure that this wasn't related to LSOA characteristics or we might find out that it is!
+- A few hundred outreach letters were returned to Warwick
+- We have an RA going through all of them; hasn't finished yet 
+- Check to make sure that LSOA characteristics aren't related to returned letters; correct response rate estimates
 
 
 # Appendix
@@ -1009,6 +1009,8 @@ within sampling noise (all $p > 0.5$).
 ## Sampling Design: Exclusion / De-duplication
 
 \hypertarget{appx-exclusion}{}
+
+\hfill\hyperlink{main-datasources}{\beamerreturnbutton{Back}}
 
 ### Addresses Excluded 
 - Hotels / student residences: 936
@@ -1032,6 +1034,8 @@ within sampling noise (all $p > 0.5$).
 
 \hypertarget{appx-imd}{}
 
+\hfill\hyperlink{main-deprivation}{\beamerreturnbutton{Back}}
+
 - Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
 - Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
 - Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
@@ -1041,6 +1045,9 @@ within sampling noise (all $p > 0.5$).
 
 \hypertarget{appx-imd-dist}{}
 
+\hfill\hyperlink{main-deprivation}{\beamerreturnbutton{Back}}
+
+\vspace{-2em}
 :::: {.columns}
 
 ::: {.column width="56%"}
@@ -1112,10 +1119,14 @@ tibble(
 
 \hypertarget{appx-imd-map}{}
 
+\hfill\hyperlink{main-deprivation}{\beamerreturnbutton{Back}}
+
+\vspace{-2em}
+
 ```{r}
 #| label: leeds-imd-map
 #| fig-width: 6.6
-#| fig-height: 4.6
+#| fig-height: 4
 leeds_lsoa <- leeds_geo |>
   left_join(lsoa_imd, by = c("LSOA21CD" = "lsoa")) |>
   mutate(quintile = factor(bin_imd(imd_score),
@@ -1133,6 +1144,8 @@ ggplot(leeds_lsoa, aes(fill = quintile)) +
 ## Heterogeneity: does the gradient differ by treatment? (Old)
 
 \hypertarget{appx-imd-treat}{}
+
+\hfill\hyperlink{main-by-age}{\beamerreturnbutton{Back}}
 
 ```{r}
 #| label: imd-by-treatment
@@ -1161,9 +1174,71 @@ imd_cells |>
 
 \footnotesize \hyperlink{appx-click-treat}{\beamergotobutton{Clicks version of this plot}}
 
+
+## Empirical Bayes Estimation of LSOA Response Rates 
+
+For LSOA $\ell$ with $n_\ell$ letters and $y_\ell$ usable responses:
+
+### Model
+$y_\ell \mid p_\ell \sim \text{Binomial}(n_\ell, p_\ell), \qquad p_\ell \sim \text{Beta}(a, b)$ — the shared prior is what lets sparse areas borrow strength.
+
+
+### Conjugate Posterior
+**Posterior** (conjugate). 
+$p_\ell \mid y_\ell \sim \text{Beta}(y_\ell + a,\ n_\ell - y_\ell + b)$, so
+
+$$\hat p_\ell = \frac{y_\ell + a}{n_\ell + a + b} = w_\ell\,\frac{y_\ell}{n_\ell} + (1 - w_\ell)\,\frac{a}{a + b}, \qquad w_\ell = \frac{n_\ell}{n_\ell + a + b}$$
+
+
+### Estimation
+Choose $(a, b)$ to maximise the marginal Beta-Binomial likelihood $\;\prod_\ell \int \text{Bin}(y_\ell \mid n_\ell, p)\,\text{Beta}(p \mid a, b)\,dp\;$, then plug in: here $\hat a \approx$ `r round(eb_a)`, $\hat b \approx$ `r round(eb_b)`.
+
+## Shrinkage of LSOA estimates, and the estimated rate distribution
+
+\vspace{-1em}
+
+```{r}
+#| label: eb-shrinkage
+#| fig-width: 7.5
+#| fig-height: 4.3
+#| out-width: 88%
+library(patchwork)
+xmax <- max(eb_lsoa$raw)
+
+funnel <- ggplot(eb_lsoa) +
+  geom_segment(aes(x = raw, xend = post, y = 1, yend = 0),
+               colour = "#3B6E8F", alpha = 0.12, linewidth = 0.2) +
+  geom_point(aes(raw,  1), colour = "#B5651D", size = 0.5, alpha = 0.5) +
+  geom_point(aes(post, 0), colour = "#3B6E8F", size = 0.5, alpha = 0.5) +
+  annotate("text", x = 0, y = 1, label = "raw  y/n", hjust = 0, vjust = -1.1, size = 3.3) +
+  annotate("text", x = 0, y = 0, label = "shrunk",   hjust = 0, vjust = 2.1,  size = 3.3) +
+  scale_x_continuous(limits = c(0, xmax)) +
+  scale_y_continuous(limits = c(-0.4, 1.4), breaks = NULL) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(), axis.text.x = element_blank())
+
+prior <- tibble(rate = seq(0, xmax, length.out = 400)) |>
+  mutate(dens = dbeta(rate / 1000, eb_a, eb_b))
+distp <- ggplot(prior, aes(rate, dens)) +
+  geom_area(fill = "#3B6E8F", alpha = 0.85) +
+  scale_x_continuous(limits = c(0, xmax)) +
+  labs(x = "Usable per 1,000", y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), axis.text.y = element_blank())
+
+funnel / distp + plot_layout(heights = c(1.1, 1))
+```
+
+\vspace{-1em}
+
+\small Top: each LSOA's raw rate (upper row) joined to its empirical-Bayes estimate (lower row). Bottom: the fitted Beta prior --- the estimated distribution of true rates.
+
 ## Usable response rate by LSOA: raw
 
 \hypertarget{appx-eb}{}
+
+\hfill\hyperlink{main-deprivation}{\beamerreturnbutton{Back}}
 
 ```{r}
 #| label: eb-map-raw
@@ -1201,62 +1276,11 @@ leeds_geo |>
 
 \small Posterior means --- *own scale (4--9) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
 
-## Shrinkage of LSOA estimates, and the estimated rate distribution
-
-```{r}
-#| label: eb-shrinkage
-#| fig-width: 7.5
-#| fig-height: 4.3
-#| out-width: 88%
-library(patchwork)
-xmax <- max(eb_lsoa$raw)
-
-funnel <- ggplot(eb_lsoa) +
-  geom_segment(aes(x = raw, xend = post, y = 1, yend = 0),
-               colour = "#3B6E8F", alpha = 0.12, linewidth = 0.2) +
-  geom_point(aes(raw,  1), colour = "#B5651D", size = 0.5, alpha = 0.5) +
-  geom_point(aes(post, 0), colour = "#3B6E8F", size = 0.5, alpha = 0.5) +
-  annotate("text", x = 0, y = 1, label = "raw  y/n", hjust = 0, vjust = -1.1, size = 3.3) +
-  annotate("text", x = 0, y = 0, label = "shrunk",   hjust = 0, vjust = 2.1,  size = 3.3) +
-  scale_x_continuous(limits = c(0, xmax)) +
-  scale_y_continuous(limits = c(-0.4, 1.4), breaks = NULL) +
-  labs(x = NULL, y = NULL) +
-  theme_minimal(base_size = 12) +
-  theme(panel.grid = element_blank(), axis.text.x = element_blank())
-
-prior <- tibble(rate = seq(0, xmax, length.out = 400)) |>
-  mutate(dens = dbeta(rate / 1000, eb_a, eb_b))
-distp <- ggplot(prior, aes(rate, dens)) +
-  geom_area(fill = "#3B6E8F", alpha = 0.85) +
-  scale_x_continuous(limits = c(0, xmax)) +
-  labs(x = "Usable per 1,000", y = NULL) +
-  theme_minimal(base_size = 12) +
-  theme(panel.grid.minor = element_blank(), axis.text.y = element_blank())
-
-funnel / distp + plot_layout(heights = c(1.1, 1))
-```
-
-\small Top: each LSOA's raw rate (upper row) joined to its empirical-Bayes estimate (lower row). Bottom: the fitted Beta prior --- the estimated distribution of true rates.
-
-## A small-area model: Beta-Binomial empirical Bayes (for reference)
-
-For LSOA $\ell$ with $n_\ell$ letters and $y_\ell$ usable responses:
-
-**Model.** $\quad y_\ell \mid p_\ell \sim \text{Binomial}(n_\ell, p_\ell), \qquad p_\ell \sim \text{Beta}(a, b)$ — the shared prior is what lets sparse areas borrow strength.
-
-**Posterior** (conjugate). $\quad p_\ell \mid y_\ell \sim \text{Beta}(y_\ell + a,\ n_\ell - y_\ell + b)$, so
-
-$$\hat p_\ell = \frac{y_\ell + a}{n_\ell + a + b} = w_\ell\,\frac{y_\ell}{n_\ell} + (1 - w_\ell)\,\frac{a}{a + b}, \qquad w_\ell = \frac{n_\ell}{n_\ell + a + b}$$
-
-a precision-weighted blend of the LSOA's own rate and the Leeds average ($a + b$ acts like $\approx$ `r round(eb_a + eb_b, -1)` "pseudo-letters").
-
-**Estimation** (empirical Bayes). Choose $(a, b)$ to maximise the marginal Beta-Binomial likelihood $\;\prod_\ell \int \text{Bin}(y_\ell \mid n_\ell, p)\,\text{Beta}(p \mid a, b)\,dp\;$, then plug in: here $\hat a \approx$ `r round(eb_a)`, $\hat b \approx$ `r round(eb_b)`.
-
-\small The classic small-area / borrowing-strength setup --- the discrete analogue of James--Stein and Fay--Herriot shrinkage.
-
 ## Clicking: deprivation gradient by housing age \hfill \small \alert{(Preliminary)}
 
 \hypertarget{appx-click-age}{}
+
+\hfill\hyperlink{main-by-age}{\beamerreturnbutton{Back}}
 
 ```{r}
 #| label: click-imd-by-age
@@ -1281,6 +1305,8 @@ imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
 ## Clicking: does the gradient differ by treatment? (Old) \hfill \small \alert{(Preliminary)}
 
 \hypertarget{appx-click-treat}{}
+
+\hfill\hyperlink{appx-imd-treat}{\beamerreturnbutton{Back}}
 
 ```{r}
 #| label: click-imd-by-treatment
