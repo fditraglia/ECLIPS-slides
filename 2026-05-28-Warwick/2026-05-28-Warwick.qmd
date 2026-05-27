@@ -801,11 +801,42 @@ raw |>
 - Split 500 kits across rounds $\propto$ expected responses; selection probabilities round-specific
 - All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 224 (R2)
 
-## Map of where we sent kits?
+## Where we sent kits
 
-- Haven't looked at this yet; might look quite different because of re-balancing
-- Also should say *who* got kits. I think we ended up sending everyone who was disadvantaged a kit.
-- This relates to the question about how the demographics of our respondents match (or do not) with the population of Leeds
+```{r}
+#| label: kits-map-and-deprivation
+#| layout-ncol: 2
+#| fig-width: 4.6
+#| fig-height: 4.6
+kits_by_lsoa <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+                         name_repair = "minimal") |>
+  filter(!is.na(treatment_kit)) |>
+  count(lsoa, name = "n_kits")
+
+# (left) Where kits went: choropleth of kits sent per LSOA.
+leeds_geo |>
+  left_join(kits_by_lsoa, by = c("LSOA21CD" = "lsoa")) |>
+  ggplot(aes(fill = n_kits)) +
+  geom_sf(colour = "white", linewidth = 0.03) +
+  scale_fill_viridis_c(option = "mako", direction = -1, name = "Kits",
+                       na.value = "grey85") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 12) +
+  theme(legend.position = "right", legend.key.width = unit(0.3, "cm"))
+
+# (right) Kits sent per LSOA vs deprivation (all 488 LSOAs; 0 if none).
+lsoa_imd |>
+  left_join(kits_by_lsoa, by = "lsoa") |>
+  mutate(n_kits = replace_na(n_kits, 0L)) |>
+  ggplot(aes(imd_score, n_kits)) +
+  geom_jitter(width = 0, height = 0.18, alpha = 0.4, colour = "#3B6E8F",
+              size = 1.1) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#B5651D",
+              fill = "#B5651D", alpha = 0.15, linewidth = 0.7) +
+  labs(x = "IMD score  (higher = more deprived)", y = "Kits sent in LSOA") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank())
+```
 
 ## Phase II: Collecting Blood Samples
 
@@ -1057,6 +1088,8 @@ bind_rows(
 
 \hfill\hyperlink{main-datasources}{\beamerreturnbutton{Back}}
 
+
+\vspace{-2em }
 ### Addresses Excluded 
 - Hotels / student residences: 936
 - Vacant properties: 931
