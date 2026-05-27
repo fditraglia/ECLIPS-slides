@@ -831,6 +831,48 @@ raw |>
 \end{tikzpicture}%
 }
 
+## No Effect of Kit Type \hfill \small \alert{(Preliminary)}
+
+```{r}
+#| label: kit-type-forest
+#| fig-width: 7.5
+#| fig-height: 3.6
+# Among the 500 kit recipients (treatment_kit non-NA). valid_sample = number of
+# valid blood spots (0/1/2), confirmed against the DBS L/R validation columns.
+kit <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+                name_repair = "minimal") |>
+  filter(!is.na(treatment_kit)) |>
+  mutate(
+    kit_type = factor(kit_type, levels = c(0, 1), labels = c("Kit 0", "Kit 1")),
+    `Completed exposure survey` = completed_exposure_survey == 1,
+    `Returned a kit (any)`      = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
+    `Returned >=1 valid spot`   = valid_sample >= 1)
+
+outcomes <- c("Completed exposure survey", "Returned a kit (any)",
+              "Returned >=1 valid spot")
+
+kit |>
+  pivot_longer(all_of(outcomes), names_to = "outcome", values_to = "hit") |>
+  group_by(kit_type, outcome) |>
+  summarise(x = sum(hit), n = n(), .groups = "drop") |>
+  rowwise() |>
+  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
+  ungroup() |>
+  mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
+         hi = map_dbl(ci, "hi") / 10,
+         outcome = factor(outcome, levels = rev(outcomes))) |>
+  ggplot(aes(est, outcome, colour = kit_type)) +
+  geom_pointrange(aes(xmin = lo, xmax = hi),
+                  position = position_dodge(width = 0.55), fatten = 2.5) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1),
+                     limits = c(0, NA)) +
+  scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
+  labs(x = paste0("Share of 500 kit recipients (", ci_pct, " Wilson CI)"),
+       y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), legend.position = "top")
+```
+
 
 ```{r}
 #| label: kit-covariate-prep
@@ -890,7 +932,7 @@ plot_kit_forest <- function(df) {
 }
 ```
 
-## Disadvantaged recipients return fewer kits \hfill \small \alert{(Preliminary)}
+## Disadvantaged participants less likely to return kits \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-disadvantaged
@@ -899,8 +941,49 @@ plot_kit_forest <- function(df) {
 plot_kit_forest(kit_forest("disadv"))
 ```
 
+## Disadvantaged participants less likely to return kits \hfill \small \alert{(Preliminary)}
 
-## The same gradient: tenure and education \hfill \small \alert{(Preliminary)} 
+```{r}
+#| label: kit-return-disadv-diff
+#| fig-width: 7.5
+#| fig-height: 2.6
+# Score (Newcombe) interval for a difference of proportions, built from the two
+# Wilson score intervals. Contrast = disadvantaged - not disadvantaged.
+wilson_lohi <- function(x, n) {
+  z <- qnorm(1 - (1 - ci_level) / 2); p <- x / n
+  ctr <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
+  h   <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
+  c(lo = ctr - h, hi = ctr + h)
+}
+score_diff <- function(x1, n1, x0, n0) {
+  p1 <- x1 / n1; p0 <- x0 / n0; w1 <- wilson_lohi(x1, n1); w0 <- wilson_lohi(x0, n0)
+  d <- p1 - p0
+  tibble(diff = d,
+         lo = unname(d - sqrt((p1 - w1["lo"])^2 + (w0["hi"] - p0)^2)),
+         hi = unname(d + sqrt((w1["hi"] - p1)^2 + (p0 - w0["lo"])^2)))
+}
+outc <- c("Returned any kit" = "returned", ">=1 valid spot" = "valid")
+imap_dfr(outc, \(col, lab) {
+  d1 <- filter(kitc, disadv == "Disadvantaged")
+  d0 <- filter(kitc, disadv == "Not disadvantaged")
+  score_diff(sum(d1[[col]]), nrow(d1), sum(d0[[col]]), nrow(d0)) |>
+    mutate(outcome = lab)
+}) |>
+  mutate(outcome = factor(outcome, levels = rev(names(outc))),
+         across(c(diff, lo, hi), \(x) 100 * x)) |>
+  ggplot(aes(diff, outcome)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
+  geom_pointrange(aes(xmin = lo, xmax = hi), colour = "#3B6E8F",
+                  fatten = 3, linewidth = 0.8) +
+  labs(x = "Disadvantaged - not disadvantaged (percentage points)", y = NULL,
+       caption = paste0(ci_pct, " Newcombe score interval")) +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+
+## Housing Tenure and Education Predict Return Rates \hfill \small \alert{(Preliminary)} 
 
 ```{r}
 #| label: kit-return-ses
@@ -917,19 +1000,8 @@ bind_rows(
 ```
 
 
-## The personalized-risk letter lifts kit return too \hfill \small \alert{(Preliminary)} 
 
-```{r}
-#| label: kit-return-letter
-#| fig-width: 7.5
-#| fig-height: 2.8
-plot_kit_forest(kit_forest("letter"))
-```
-
-\footnotesize Same ordering as the letter RCT's effect on starting the survey
-(C $<$ G $<$ P), now carried all the way through to returning a blood kit.
-
-## Worry and prior knowledge don't predict return \hfill \small \alert{(Preliminary)}
+## Worry / Prior Lead Knowledge Don't Predict Return Rates \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-attitudes
@@ -947,48 +1019,6 @@ bind_rows(
   facet_grid(panel ~ ., scales = "free_y", space = "free_y")
 ```
 
-
-## Kit type does not move completion or return \hfill \small \alert{(Preliminary)}
-
-```{r}
-#| label: kit-type-forest
-#| fig-width: 7.5
-#| fig-height: 3.6
-# Among the 500 kit recipients (treatment_kit non-NA). valid_sample = number of
-# valid blood spots (0/1/2), confirmed against the DBS L/R validation columns.
-kit <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
-                name_repair = "minimal") |>
-  filter(!is.na(treatment_kit)) |>
-  mutate(
-    kit_type = factor(kit_type, levels = c(0, 1), labels = c("Kit 0", "Kit 1")),
-    `Completed exposure survey` = completed_exposure_survey == 1,
-    `Returned a kit (any)`      = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
-    `Returned >=1 valid spot`   = valid_sample >= 1)
-
-outcomes <- c("Completed exposure survey", "Returned a kit (any)",
-              "Returned >=1 valid spot")
-
-kit |>
-  pivot_longer(all_of(outcomes), names_to = "outcome", values_to = "hit") |>
-  group_by(kit_type, outcome) |>
-  summarise(x = sum(hit), n = n(), .groups = "drop") |>
-  rowwise() |>
-  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
-  ungroup() |>
-  mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
-         hi = map_dbl(ci, "hi") / 10,
-         outcome = factor(outcome, levels = rev(outcomes))) |>
-  ggplot(aes(est, outcome, colour = kit_type)) +
-  geom_pointrange(aes(xmin = lo, xmax = hi),
-                  position = position_dodge(width = 0.55), fatten = 2.5) +
-  scale_x_continuous(labels = scales::label_percent(scale = 1),
-                     limits = c(0, NA)) +
-  scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
-  labs(x = paste0("Share of 500 kit recipients (", ci_pct, " Wilson CI)"),
-       y = NULL) +
-  theme_minimal(base_size = 12) +
-  theme(panel.grid.minor = element_blank(), legend.position = "top")
-```
 
 
 <!--## Feedback survey
