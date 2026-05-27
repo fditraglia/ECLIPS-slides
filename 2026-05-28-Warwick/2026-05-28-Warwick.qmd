@@ -13,6 +13,7 @@ format:
       \usetikzlibrary{arrows}
       \usetikzlibrary{shapes}
       \usetikzlibrary{arrows.meta}
+      \usetikzlibrary{fit}
       \usepackage{booktabs}
 ---
 
@@ -960,31 +961,27 @@ imd_cells |>
 
 ## Phase II: Collecting Blood Samples
 
-**Update numbers in this flowchart; can give current estimate of response rates although still accepting round 2 kits**
-
-Baseline survey & census: choose probs of sending each household a kit (2000 to 500)
-
 \centering
-\begin{tikzpicture}[scale=0.4]
-   \node (kits) [draw, align = center]{Send 500 Blood Test Kits \\ and Midline Surveys};
-   \node (pack) [draw, below right of=kits, align = center, node distance = 2.5cm]{Control\\ 250 Kits};
-   \node(nopack)[draw, below left of =kits, align = center, node distance = 2.5cm]{Treatment \\ 250 Kits};
-   \draw[->] (kits) -- (pack) node[midway, right]{Randomize Kits};
-   \draw[->] (kits) -- (nopack);
-   \node (blood) [draw, below left of=pack,align = center, node distance = 2.5cm]{$\approx 70$ Returned Kits \\ \& Midline Surveys};
-   \node (nobloodnopack) [draw, dashed, below left of=nopack, node distance = 2.5cm, align = center]{No \\ Response};
-   \node (nobloodpack) [draw, dashed, below right of=pack, node distance = 2.5cm, align = center]{No \\ Response};
-   \draw[->] (nopack) -- (blood); 
-   \draw[->] (pack) -- (blood) node[midway, right]{14\% Response};
-   \node (experience) [draw, below of=blood, align = center, node distance = 1.5cm]{Send 200 Experience Surveys};
-   \draw[->, dashed] (nopack) -- (nobloodnopack); 
-   \draw[->, dashed] (pack) -- (nobloodpack);
-   \draw[->, dashed] (nobloodnopack) -- (experience);
-   \draw[->, dashed] (nobloodpack) -- (experience);
-   \draw[->] (blood) -- (experience);
-\end{tikzpicture}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[every node/.style={draw, align=center, font=\small}, >=stealth]
+  \node (usable) at (0,0)     {890 Usable Respondents};
+  \node (kits)   at (0,-1.6)  {Send 500 Kits + Exposure Survey};
+  \node (kitA)   at (-3.3,-3.4) {Kit A \\ 251};
+  \node (kitB)   at (3.3,-3.4)  {Kit B \\ 249};
+  \node (Aret)   at (-5,-5.7)  {Returned kit \\ 79 (31\%) \\ {\scriptsize 59 valid}};
+  \node (Asur)   at (-1.7,-5.7) {Exposure survey \\ 82 (33\%)};
+  \node (Bret)   at (1.7,-5.7)  {Returned kit \\ 75 (30\%) \\ {\scriptsize 58 valid}};
+  \node (Bsur)   at (5,-5.7)   {Exposure survey \\ 74 (30\%)};
 
-35 GBP for returned sample / midline survey; 10 GBP for experience survey
+  \draw[->] (usable) -- (kits) node[midway, right, draw=none]{re-balanced $\approx 56\%$};
+  \draw[->] (kits) -- (kitA);
+  \draw[->] (kits) -- (kitB) node[midway, above right, draw=none]{randomize kit type};
+  \draw[->] (kitA) -- (Aret);
+  \draw[->] (kitA) -- (Asur);
+  \draw[->] (kitB) -- (Bret);
+  \draw[->] (kitB) -- (Bsur);
+\end{tikzpicture}%
+}
 
 
 ## Who returns a blood sample?
