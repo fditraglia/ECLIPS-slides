@@ -680,109 +680,7 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 ```
 
 
-## What is the Index of Multiple Deprivation (IMD)?
-
-\alert{Turn this into a backup slide with a link.}
-
-- Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
-- Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
-- Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
-- Here: rank Leeds LSOAs by deprivation and split into **quintiles** (equal fifths of LSOAs; Q1 = least, Q5 = most deprived)
-
-## Distribution of LSOA deprivation: England vs Leeds
-
-\alert{Turn this into a back-up slide}
-
-:::: {.columns}
-
-::: {.column width="56%"}
-
-```{r}
-#| label: imd-england-vs-leeds
-#| fig-width: 4.8
-#| fig-height: 4.8
-#| out-width: 100%
-library(patchwork)
-
-# England (all LSOAs, including Leeds) vs Leeds alone, on a shared score axis.
-eng   <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE)
-xlims <- range(eng$imd_score)
-
-dens <- function(df, ttl, fillcol, xlab = NULL) {
-  ggplot(df, aes(imd_score)) +
-    geom_density(fill = fillcol, colour = NA) +
-    coord_cartesian(xlim = xlims) +
-    labs(title = ttl, x = xlab, y = NULL) +
-    theme_minimal(base_size = 12) +
-    theme(axis.text.y = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(size = 12))
-}
-
-dens(eng, "England — 33,755 LSOAs", "grey65") /
-  dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", "#B5651D",
-       xlab = "IMD score  (higher = more deprived)")
-```
-
-:::
-
-::: {.column width="40%"}
-
-\vspace{2em}
-
-\footnotesize
-
-```{r}
-#| label: imd-england-vs-leeds-table
-#| results: asis
-tab <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE) |>
-  mutate(leeds = lsoa %in% lsoa_imd$lsoa, dec = ntile(-imd_score, 10))
-
-fmt <- function(d) c(
-  sprintf("%.1f", median(d$imd_score)),
-  sprintf("%.0f%%", 100 * mean(d$dec == 1)),
-  sprintf("%.0f%%", 100 * mean(d$dec == 10)),
-  sprintf("%.0f%%", 100 * mean(d$dec %in% 4:7)))
-
-tibble(
-  Measure = c("Median IMD score",
-              "Most-deprived decile",
-              "Least-deprived decile",
-              "Middle (deciles 4--7)"),
-  England = fmt(tab),
-  Leeds   = fmt(filter(tab, leeds))
-) |>
-  knitr::kable(format = "latex", booktabs = TRUE, align = "lrr", linesep = "",
-               col.names = c("", "England", "Leeds"))
-```
-
-:::
-
-::::
-
-## Quintiles of Deprivation in Leeds: by LSOA 
-
-\alert{Turn this into a back-up slide; possibly better to show how where we sent letters aligns with deprivation. Maybe a scatterplot of deprivation with share of letters sent.}
-
-```{r}
-#| label: leeds-imd-map
-#| fig-width: 6.6
-#| fig-height: 4.6
-leeds_lsoa <- leeds_geo |>
-  left_join(lsoa_imd, by = c("LSOA21CD" = "lsoa")) |>
-  mutate(quintile = factor(bin_imd(imd_score),
-                           labels = c("Q1 least", "Q2", "Q3", "Q4", "Q5 most")))
-
-ggplot(leeds_lsoa, aes(fill = quintile)) +
-  geom_sf(colour = "white", linewidth = 0.05) +
-  scale_fill_brewer(palette = "YlOrBr", direction = 1, na.value = "grey85",
-                    name = "IMD quintile") +
-  coord_sf(datum = NA) +
-  theme_void(base_size = 13) +
-  theme(legend.position = "right")
-```
-
-## Lower response rate in more deprived LSOAs 
+## Lower response rate in more deprived LSOAs
 
 ```{r}
 #| label: usable-imd-marginal
@@ -798,6 +696,11 @@ imd_summary(imd_cells) |>
   theme(plot.caption = element_text(size = 9, colour = "grey40"),
         plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
+
+\footnotesize Background:
+\hyperlink{appx-imd}{\beamergotobutton{What is IMD?}}
+\hyperlink{appx-imd-dist}{\beamergotobutton{England vs Leeds}}
+\hyperlink{appx-imd-map}{\beamergotobutton{Leeds deprivation map}}
 
 ## ... but mainly driven by Old houses
 
@@ -821,6 +724,8 @@ imd_summary(imd_cells, "age_grp", outcome = "usable") |>
         plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 ```
 
+\footnotesize \hyperlink{appx-imd-treat}{\beamergotobutton{Does the gradient differ by treatment?}}
+
 ## More Old housing in deprived LSOAs areas
 
 ```{r}
@@ -843,36 +748,9 @@ addr_imd |>
   theme(legend.position = "bottom")
 ```
 
-## Heterogeneity: does the gradient differ by treatment? (Old)
+\footnotesize \hyperlink{appx-explain}{\beamergotobutton{Why? Putting the gradient together}}
 
-\alert{backup slide}
-
-```{r}
-#| label: imd-by-treatment
-#| fig-width: 7.5
-#| fig-height: 3.5
-imd_cells |>
-  filter(age_grp == "Old") |>
-  imd_summary("treatment") |>
-  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
-                            P = "Personalized")) |>
-  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.12)) +
-  scale_colour_manual(values = c("Control" = "#666666",
-                                 "Generalized" = "#3B6E8F",
-                                 "Personalized" = "#B5651D")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Usable per 1,000", colour = NULL,
-       caption = paste0("Old houses only; ", ci_caption)) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
-```
-
-## Responder demographics versus LSOA deprivation 
+## Responder demographics versus LSOA deprivation
 
 ```{r}
 #| label: responder-traits-imd
@@ -913,18 +791,6 @@ raw |>
   theme_minimal(base_size = 11) +
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
 ```
-
-## Explanation 
-
-\alert{backup slide}
-
-- Old houses respond **more** than New / Unknown.
-- Old houses are **concentrated in the most-deprived areas**.
-- Yet the most-deprived areas respond **less**.
-
-\vspace{0.8em}
-
-\alert{Why:} deprivation lowers response *within every house type* (Old: 14.4 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.6$ vs.\ the headline $-2.1$ per 1,000).
 
 ## Usable response rate by LSOA: raw
 
@@ -1316,3 +1182,146 @@ within sampling noise (all $p > 0.5$).
 - OA (2,607), LSOA (488), MSOA (107)
 - EPC Housing age: "Old" if $\leq 1966$ (missing for 38.5\%)
 - \# Households in LSOA $\geq$ one child aged $\leq 9$ (2021 Census)
+
+## What is the Index of Multiple Deprivation (IMD)?
+
+\hypertarget{appx-imd}{}
+
+- Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
+- Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
+- Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
+- Here: rank Leeds LSOAs by deprivation and split into **quintiles** (equal fifths of LSOAs; Q1 = least, Q5 = most deprived)
+
+## Distribution of LSOA deprivation: England vs Leeds
+
+\hypertarget{appx-imd-dist}{}
+
+:::: {.columns}
+
+::: {.column width="56%"}
+
+```{r}
+#| label: imd-england-vs-leeds
+#| fig-width: 4.8
+#| fig-height: 4.8
+#| out-width: 100%
+library(patchwork)
+
+# England (all LSOAs, including Leeds) vs Leeds alone, on a shared score axis.
+eng   <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE)
+xlims <- range(eng$imd_score)
+
+dens <- function(df, ttl, fillcol, xlab = NULL) {
+  ggplot(df, aes(imd_score)) +
+    geom_density(fill = fillcol, colour = NA) +
+    coord_cartesian(xlim = xlims) +
+    labs(title = ttl, x = xlab, y = NULL) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.y = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.title = element_text(size = 12))
+}
+
+dens(eng, "England — 33,755 LSOAs", "grey65") /
+  dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", "#B5651D",
+       xlab = "IMD score  (higher = more deprived)")
+```
+
+:::
+
+::: {.column width="40%"}
+
+\vspace{2em}
+
+\footnotesize
+
+```{r}
+#| label: imd-england-vs-leeds-table
+#| results: asis
+tab <- read_csv("../data/england-lsoa-imd-2025-scores.csv", show_col_types = FALSE) |>
+  mutate(leeds = lsoa %in% lsoa_imd$lsoa, dec = ntile(-imd_score, 10))
+
+fmt <- function(d) c(
+  sprintf("%.1f", median(d$imd_score)),
+  sprintf("%.0f%%", 100 * mean(d$dec == 1)),
+  sprintf("%.0f%%", 100 * mean(d$dec == 10)),
+  sprintf("%.0f%%", 100 * mean(d$dec %in% 4:7)))
+
+tibble(
+  Measure = c("Median IMD score",
+              "Most-deprived decile",
+              "Least-deprived decile",
+              "Middle (deciles 4--7)"),
+  England = fmt(tab),
+  Leeds   = fmt(filter(tab, leeds))
+) |>
+  knitr::kable(format = "latex", booktabs = TRUE, align = "lrr", linesep = "",
+               col.names = c("", "England", "Leeds"))
+```
+
+:::
+
+::::
+
+## Quintiles of Deprivation in Leeds: by LSOA
+
+\hypertarget{appx-imd-map}{}
+
+```{r}
+#| label: leeds-imd-map
+#| fig-width: 6.6
+#| fig-height: 4.6
+leeds_lsoa <- leeds_geo |>
+  left_join(lsoa_imd, by = c("LSOA21CD" = "lsoa")) |>
+  mutate(quintile = factor(bin_imd(imd_score),
+                           labels = c("Q1 least", "Q2", "Q3", "Q4", "Q5 most")))
+
+ggplot(leeds_lsoa, aes(fill = quintile)) +
+  geom_sf(colour = "white", linewidth = 0.05) +
+  scale_fill_brewer(palette = "YlOrBr", direction = 1, na.value = "grey85",
+                    name = "IMD quintile") +
+  coord_sf(datum = NA) +
+  theme_void(base_size = 13) +
+  theme(legend.position = "right")
+```
+
+## Heterogeneity: does the gradient differ by treatment? (Old)
+
+\hypertarget{appx-imd-treat}{}
+
+```{r}
+#| label: imd-by-treatment
+#| fig-width: 7.5
+#| fig-height: 3.5
+imd_cells |>
+  filter(age_grp == "Old") |>
+  imd_summary("treatment") |>
+  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
+                            P = "Personalized")) |>
+  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
+  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
+                  position = position_dodge(0.12)) +
+  scale_colour_manual(values = c("Control" = "#666666",
+                                 "Generalized" = "#3B6E8F",
+                                 "Personalized" = "#B5651D")) +
+  labs(x = "IMD quintile  (left = least deprived)",
+       y = "Usable per 1,000", colour = NULL,
+       caption = paste0("Old houses only; ", ci_caption)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"),
+        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+```
+
+## Explanation
+
+\hypertarget{appx-explain}{}
+
+- Old houses respond **more** than New / Unknown.
+- Old houses are **concentrated in the most-deprived areas**.
+- Yet the most-deprived areas respond **less**.
+
+\vspace{0.8em}
+
+\alert{Why:} deprivation lowers response *within every house type* (Old: 14.4 to 6.4 per 1,000). Deprived areas being Old-heavy only **partly** offsets this --- so response still falls, and the Old-house mix **hides how steep the deprivation penalty really is** (about $-3.6$ vs.\ the headline $-2.1$ per 1,000).
