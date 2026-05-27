@@ -244,25 +244,25 @@ plot_bar <- function(var, base = 12) {
 
 ## Phase I: Recruiting / Study Participation Decision
 
-**Update this by removing ineligible / eligible and putting actual responses**
-
 \centering
-  \begin{tikzpicture}[scale=0.5]
-  \node (households) [draw,align=center] {All Leeds Residential Addresses \\ $\approx 373,000$};
-  \node (letters) [draw, below of=households, node distance=2cm,align=center] {Send 200,000 Letters};  
-  \node (ineligible) [draw, dashed, below left of=letters, align=center, node distance = 2.5cm] {$\approx180,000$ \\ Ineligible};  
-  \node (eligible) [draw, below right of=letters, align=center, node distance = 2.5cm] {$\approx 20,000$ \\ Eligible};  
-  \node (respond) [draw, below right of=eligible, align=center, node distance=2.5cm] {$\approx 2000$ \\ Baseline Surveys};  
-  \node (nonrespond) [draw, dashed, below left of=eligible, align=center, node distance=2.5cm] {No Response \\ $\approx 18,000$};  
+\begin{tikzpicture}[scale=0.5, every node/.style={align=center}]
+  \node (addr) [draw] {All Leeds Residential Addresses \\ $370{,}666$};
+  \node (letters) [draw, below of=addr, node distance=2.2cm] {Send $150{,}000$ Letters};
+  \node (started) [draw, below right of=letters, node distance=2.7cm] {$1{,}645$ \\ Started Survey};
+  \node (noresp) [draw, dashed, below left of=letters, node distance=2.7cm] {No Response \\ $148{,}355$};
+  \node (usable) [draw, below right of=started, node distance=2.7cm] {$890$ \\ Usable Responses};
+  \node (drop) [draw, dashed, below left of=started, node distance=2.7cm] {Ineligible or \\ no consent \\ $755$};
 
-  \draw[->] (households) -- (letters) node[midway, right]{Randomly Sample Addresses};
-  \draw[->, dashed] (letters) -- (ineligible);
-  \draw[->] (letters) -- (eligible) node[midway, right]{$10\%$ with Young Children};
-  \draw[->] (eligible) -- (respond) node[midway, right]{$10\%$ Response };
-  \draw[->, dashed] (eligible) -- (nonrespond);
+  \draw[->] (addr) -- (letters) node[midway, right]{Stratified Random Sample ($\approx 40\%$)};
+  \draw[->] (letters) -- (started) node[midway, right]{$1.1\%$};
+  \draw[->, dashed] (letters) -- (noresp);
+  \draw[->] (started) -- (usable) node[midway, right]{$54\%$};
+  \draw[->, dashed] (started) -- (drop);
 \end{tikzpicture}
 
-5 GBP gift card for sign-up and baseline survey completion
+\vspace{0.5em}
+
+\footnotesize \alert{Usable response}: eligible child (aged 1--6), valid consent, and GP details provided. \quad £5 gift card for sign-up and baseline survey completion.
 
 
 ## Research Question: who responds and why?
@@ -387,6 +387,28 @@ top + plot_spacer() + main + right +
 ```
 
 
+## Letters sent vs. LSOA deprivation
+
+```{r}
+#| label: letters-vs-deprivation
+#| fig-width: 7.5
+#| fig-height: 3.8
+letters_by_lsoa |>
+  inner_join(lsoa_imd, by = "lsoa") |>
+  mutate(share = n_letters / sum(n_letters)) |>
+  ggplot(aes(imd_score, share)) +
+  geom_point(alpha = 0.45, colour = "#3B6E8F", size = 1.1) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#B5651D",
+              fill = "#B5651D", alpha = 0.15, linewidth = 0.7) +
+  scale_y_continuous(labels = scales::label_percent(accuracy = 0.1)) +
+  labs(x = "IMD score  (higher = more deprived)",
+       y = "Share of all letters sent") +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.minor = element_blank())
+```
+
+\footnotesize One point per LSOA. Letters were allocated on estimated eligibility and
+housing age --- not deprivation directly --- so any gradient here is indirect.
 
 
 ## Randomized Controlled Trial \#1: Recruiting Letter
