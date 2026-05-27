@@ -897,6 +897,12 @@ kitc <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
              str_detect(highest_education, "age 18|Post-school")         ~ "A-level / vocational",
              str_detect(highest_education, "age 16|No formal")           ~ "<=GCSE / none"),
            levels = c("Degree", "A-level / vocational", "<=GCSE / none")),
+    inc = factor(case_when(
+            income %in% c("Under £15,000", "£15,000 - £24,999")        ~ "< £25k",
+            income %in% c("£25,000 - £34,999", "£35,000 - £49,999")    ~ "£25-50k",
+            income %in% c("£50,000 - £74,999", "£75,000 - £99,999")    ~ "£50-100k",
+            income %in% c("£100,000 - £149,999", "£150,000 and above") ~ "£100k+"),
+          levels = c("£100k+", "£50-100k", "£25-50k", "< £25k")),
     worry = factor(worried_exposure,
              levels = c("Not worried", "A little worried", "Quite worried", "Very worried")),
     knew = factor(prior_lead_knowledge, levels = c("Yes", "No", "Not sure")),
@@ -1001,7 +1007,16 @@ bind_rows(
 
 
 
-## Worry / Prior Lead Knowledge Don't Predict Return Rates \hfill \small \alert{(Preliminary)}
+## Income and Kit Return Rates \hfill \small \alert{(Preliminary)}
+
+```{r}
+#| label: kit-return-income
+#| fig-width: 7.5
+#| fig-height: 3.0
+plot_kit_forest(kit_forest("inc"))
+```
+
+## Worry / Prior Lead Knowledge and Return Rates \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-attitudes
