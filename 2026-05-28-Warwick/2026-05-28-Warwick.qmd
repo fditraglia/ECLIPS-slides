@@ -221,7 +221,28 @@ plot_bar <- function(var, base = 12) {
 
 ---
 
-## Phase I: Recruiting / Study Participation Decision 
+## Recruitment \& Treatment Allocation 
+
+\vspace{1em}
+\centering
+\begin{tikzpicture}[
+    every node/.style={align=center},
+    block/.style={draw, rounded corners, fill=blue!8, minimum width=3.2cm,
+                  minimum height=2cm, font=\small},
+    >={Stealth[length=3mm]}]
+
+  \node (sampling) [block] {\textbf{1. Sampling}\\\textbf{Design}};
+  \node (intake) [block, right=1.4cm of sampling] {\textbf{2. Recruitment}\\\textbf{/ Intake}};
+  \node (kits) [block, right=1.4cm of intake] {\textbf{3. Kit Allocation,}\\\textbf{Randomization}\\\textbf{\& Exposure Survey}};
+
+  \draw[->, thick] (sampling) -- (intake);
+  \draw[->, thick] (intake) -- (kits);
+\end{tikzpicture}
+
+
+---
+
+## Phase I: Recruiting / Study Participation Decision
 
 **Update this by removing ineligible / eligible and putting actual responses**
 
@@ -272,12 +293,30 @@ Merge Postcode, OA, LSOA and MSOA with Council Tax data (by UPRN)
 Merge Housing age (use latest certificate) with Council Tax data (by UPRN)
 
 ### Census Data (2021) at LSOA level 
-Merge LSOA-level demographics with Council Tax data (by LSOA)
+Merge LSOA-level demographics with Council Tax datai (by LSOA)
 
 ### Exclusion / De-duplication
 See appendix slide for details.
 
 
+## Big differences in HHs with kids across LSOA
+
+```{r}
+#| label: lsoa-eligible-share-hist
+#| fig-width: 7
+#| fig-height: 3.8
+read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
+         show_col_types = FALSE) |>
+  mutate(elig_rate = households_0_9 / total_households) |>
+  ggplot(aes(elig_rate)) +
+  geom_histogram(bins = 40, fill = "#3B6E8F", colour = "white", linewidth = 0.1) +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
+  labs(x = "Eligible HH in LSOA / Total HH in LSOA", y = "Number of LSOAs") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank())
+```
+
+Estimated from 2021 Census (children aged 0--9), one observation per LSOA.
 
 
 ## Stratified Random Sampling to Improve Precision
@@ -301,7 +340,7 @@ See appendix slide for details.
 
   
 
-## Where we sent letters, and why
+## Where we sent letters
 
 ```{r}
 #| label: letters-map-and-scatter
@@ -329,7 +368,8 @@ main <- ggplot(d, aes(E_l, n_letters)) +
   geom_abline(slope = sum(d$n_letters), intercept = 0,
               linetype = "dashed", colour = "grey55") +
   geom_point(alpha = 0.45, colour = col, size = 1.1) +
-  labs(x = "Estimated eligible share", y = "Letters mailed") +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 0.1)) +
+  labs(x = "Eligible in LSOA / Total Eligible", y = "Letters mailed") +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank())
 
@@ -418,6 +458,7 @@ Send 30k letters; wait 45 days; \# of responses $R_1$ determines letters sent in
 ## Realized Allocation 
 
 \alert{Based on the Round 1 Response Rate}
+
 - Sent 120k letters in Round 2 (150k total)
 - Fewer disadvantaged than kits earmarked for them (all got a kit)
   - 100 kits in Round 1, 49 disadvantaged 
@@ -641,12 +682,16 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 
 ## What is the Index of Multiple Deprivation (IMD)?
 
+\alert{Turn this into a backup slide with a link.}
+
 - Official England-wide deprivation measure, published by the Ministry of Housing, Communities \& Local Government; scored for each LSOA ($\approx$ 1,500 residents)
 - Combines **seven domains**: income; employment; education \& skills; health \& disability; crime; barriers to housing \& services; living environment
 - Higher score = more deprived; we use **IMD 2025** (2021 LSOA boundaries, matching our Census)
 - Here: rank Leeds LSOAs by deprivation and split into **quintiles** (equal fifths of LSOAs; Q1 = least, Q5 = most deprived)
 
 ## Distribution of LSOA deprivation: England vs Leeds
+
+\alert{Turn this into a back-up slide}
 
 :::: {.columns}
 
@@ -716,6 +761,8 @@ tibble(
 ::::
 
 ## Quintiles of Deprivation in Leeds: by LSOA 
+
+\alert{Turn this into a back-up slide; possibly better to show how where we sent letters aligns with deprivation. Maybe a scatterplot of deprivation with share of letters sent.}
 
 ```{r}
 #| label: leeds-imd-map
@@ -798,6 +845,8 @@ addr_imd |>
 
 ## Heterogeneity: does the gradient differ by treatment? (Old)
 
+\alert{backup slide}
+
 ```{r}
 #| label: imd-by-treatment
 #| fig-width: 7.5
@@ -865,7 +914,9 @@ raw |>
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
 ```
 
-## A puzzle, resolved
+## Explanation 
+
+\alert{backup slide}
 
 - Old houses respond **more** than New / Unknown.
 - Old houses are **concentrated in the most-deprived areas**.
@@ -1055,18 +1106,189 @@ Baseline survey & census: choose probs of sending each household a kit (2000 to 
 - Look at this by "golden envelope" treatment 
 - Could also correlate with demographics / knowledge about lead etc. These need to be re-weighted so they're slightly trickier. Use the re-balancing weights.
 
+```{r}
+#| label: kit-covariate-prep
+#| include: false
+# Covariate descriptives for the 500 kit recipients. Two nested return outcomes:
+# returned = card came back & assessed (154); valid = >=1 valid blood spot (117).
+kitc <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+                 name_repair = "minimal") |>
+  filter(!is.na(treatment_kit)) |>
+  mutate(
+    returned = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
+    valid    = valid_sample >= 1,
+    disadv = factor(if_else(disadvantaged, "Disadvantaged", "Not disadvantaged"),
+                    levels = c("Not disadvantaged", "Disadvantaged")),
+    tenure = factor(case_when(
+               str_starts(home, "Owned")            ~ "Owned",
+               str_detect(home, "private landlord") ~ "Rented (private)",
+               str_detect(home, "council")          ~ "Rented (council)"),
+             levels = c("Owned", "Rented (private)", "Rented (council)")),
+    educ = factor(case_when(
+             str_detect(highest_education, "Undergraduate|Postgraduate") ~ "Degree",
+             str_detect(highest_education, "age 18|Post-school")         ~ "A-level / vocational",
+             str_detect(highest_education, "age 16|No formal")           ~ "<=GCSE / none"),
+           levels = c("Degree", "A-level / vocational", "<=GCSE / none")),
+    worry = factor(worried_exposure,
+             levels = c("Not worried", "A little worried", "Quite worried", "Very worried")),
+    knew = factor(prior_lead_knowledge, levels = c("Yes", "No", "Not sure")),
+    letter = factor(treatment_parsed, levels = c("C", "G", "P"),
+             labels = c("Control", "Generalized", "Personalized")))
+
+# Rate + Wilson CI (in %) for one categorical var, both return outcomes; drop tiny cats.
+kit_forest <- function(var, min_n = 10) {
+  kitc |>
+    filter(!is.na(.data[[var]])) |>
+    pivot_longer(c(returned, valid), names_to = "outcome", values_to = "hit") |>
+    mutate(outcome = factor(outcome, levels = c("returned", "valid"),
+                            labels = c("Returned any kit", ">=1 valid spot"))) |>
+    group_by(level = .data[[var]], outcome) |>
+    summarise(x = sum(hit), n = n(), .groups = "drop") |>
+    filter(n >= min_n) |>
+    rowwise() |>
+    mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
+    ungroup() |>
+    mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
+           hi = map_dbl(ci, "hi") / 10)
+}
+
+plot_kit_forest <- function(df) {
+  ggplot(df, aes(est, fct_rev(level), colour = outcome)) +
+    geom_pointrange(aes(xmin = lo, xmax = hi),
+                    position = position_dodge(width = 0.55), fatten = 2.2) +
+    scale_x_continuous(labels = scales::label_percent(scale = 1), limits = c(0, NA)) +
+    scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
+    labs(x = paste0("Share of kit recipients (", ci_pct, " Wilson CI)"), y = NULL) +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank(), legend.position = "top")
+}
+```
+
+## Disadvantaged recipients return fewer kits \hfill {\small\alert{Preliminary}}
+
+```{r}
+#| label: kit-return-disadvantaged
+#| fig-width: 7.5
+#| fig-height: 2.4
+plot_kit_forest(kit_forest("disadv"))
+```
+
+\footnotesize *Disadvantaged* is the design's kit-stage flag (low income / low
+education / English-language difficulty). Rates are conditional on receiving a kit;
+disadvantaged households were over-sampled for kits, so a population statement needs
+the re-balancing weights.
+
+## The same gradient: tenure and education \hfill {\small\alert{Preliminary}}
+
+```{r}
+#| label: kit-return-ses
+#| fig-width: 7.5
+#| fig-height: 4.1
+bind_rows(
+  kit_forest("tenure") |> mutate(panel = "Housing tenure"),
+  kit_forest("educ")   |> mutate(panel = "Education")) |>
+  mutate(level = factor(level, levels = c("Owned", "Rented (private)", "Rented (council)",
+                                          "Degree", "A-level / vocational", "<=GCSE / none")),
+         panel = factor(panel, levels = c("Housing tenure", "Education"))) |>
+  plot_kit_forest() +
+  facet_grid(panel ~ ., scales = "free_y", space = "free_y")
+```
+
+\footnotesize Overlapping cuts, not independent findings: the *disadvantaged* flag is
+partly built from education and income.
+
+## The personalized-risk letter lifts kit return too \hfill {\small\alert{Preliminary}}
+
+```{r}
+#| label: kit-return-letter
+#| fig-width: 7.5
+#| fig-height: 2.8
+plot_kit_forest(kit_forest("letter"))
+```
+
+\footnotesize Same ordering as the letter RCT's effect on starting the survey
+(C $<$ G $<$ P), now carried all the way through to returning a blood kit.
+
+## Worry and prior knowledge don't predict return \hfill {\small\alert{Preliminary}}
+
+```{r}
+#| label: kit-return-attitudes
+#| fig-width: 7.5
+#| fig-height: 4.1
+bind_rows(
+  kit_forest("worry") |> mutate(panel = "Worried about lead?"),
+  kit_forest("knew")  |> mutate(panel = "Knew about lead beforehand?")) |>
+  mutate(level = factor(level, levels = c("Not worried", "A little worried",
+                                          "Quite worried", "Very worried",
+                                          "Yes", "No", "Not sure")),
+         panel = factor(panel, levels = c("Worried about lead?",
+                                          "Knew about lead beforehand?"))) |>
+  plot_kit_forest() +
+  facet_grid(panel ~ ., scales = "free_y", space = "free_y")
+```
+
+\footnotesize Self-reported attitudes are flat across the return outcomes:
+stated worry / knowledge does not translate into returning a kit.
+
+## Kit type does not move completion or return \hfill {\small\alert{Preliminary}}
+
+```{r}
+#| label: kit-type-forest
+#| fig-width: 7.5
+#| fig-height: 3.6
+# Among the 500 kit recipients (treatment_kit non-NA). valid_sample = number of
+# valid blood spots (0/1/2), confirmed against the DBS L/R validation columns.
+kit <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+                name_repair = "minimal") |>
+  filter(!is.na(treatment_kit)) |>
+  mutate(
+    kit_type = factor(kit_type, levels = c(0, 1), labels = c("Kit 0", "Kit 1")),
+    `Completed exposure survey` = completed_exposure_survey == 1,
+    `Returned a kit (any)`      = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
+    `Returned >=1 valid spot`   = valid_sample >= 1)
+
+outcomes <- c("Completed exposure survey", "Returned a kit (any)",
+              "Returned >=1 valid spot")
+
+kit |>
+  pivot_longer(all_of(outcomes), names_to = "outcome", values_to = "hit") |>
+  group_by(kit_type, outcome) |>
+  summarise(x = sum(hit), n = n(), .groups = "drop") |>
+  rowwise() |>
+  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
+  ungroup() |>
+  mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
+         hi = map_dbl(ci, "hi") / 10,
+         outcome = factor(outcome, levels = rev(outcomes))) |>
+  ggplot(aes(est, outcome, colour = kit_type)) +
+  geom_pointrange(aes(xmin = lo, xmax = hi),
+                  position = position_dodge(width = 0.55), fatten = 2.5) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1),
+                     limits = c(0, NA)) +
+  scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
+  labs(x = paste0("Share of 500 kit recipients (", ci_pct, " Wilson CI)"),
+       y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), legend.position = "top")
+```
+
+\footnotesize *Returned (any)* = blood-spot card came back and was assessed (154);
+*valid spot* = `valid_sample` $\geq 1$ (117). Differences between kit types are well
+within sampling noise (all $p > 0.5$).
+
 ## Who returns the exposure survey?
 
 - Ask Andrea about this; she has sent the vouchers for this so we can probably modify her existing code to do this; should already be anonymized and ready-to-use? 
 - Can correlate this with the same things as returning a blood sample: kit type, demographics, knowledge about lead, etc.
 
-## Feedback survey
+<!--## Feedback survey
  
 - It was opened a few days ago we think? Ask Andrea
-- Perhaps we could present some very preliminary results?
+- Perhaps we could present some very preliminary results?-->
 
 
 ## Categorizing letters
+
 - RA is still going through all the letters that were returned
 - Hasn't finished yet
 - We could add a slide here explaining what we plan to do with that information when we get it.
