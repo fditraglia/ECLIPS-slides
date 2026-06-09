@@ -799,7 +799,7 @@ raw |>
 
 ### Across rounds (realized)
 - Split 500 kits across rounds $\propto$ expected responses; selection probabilities round-specific
-- All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 224 (R2)
+- All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 \textcolor{red}{(CHECK!)} (R2)
 
 ## Where we sent kits
 
