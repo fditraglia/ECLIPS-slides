@@ -243,7 +243,7 @@ plot_bar <- function(var, base = 12) {
 Opened the baseline survey within 45 days of the letter 
 
 ### Usable Response
-Eligible child (aged 1--6), valid consent, and GP details provided
+Eligible child (aged 1--6), valid consent, and valid GP \& contact details provided
 
 ### Exposure Survey
 Completed survey (preliminary; deadline not yet specified)
@@ -799,7 +799,7 @@ raw |>
 
 ### Across rounds (realized)
 - Split 500 kits across rounds $\propto$ expected responses; selection probabilities round-specific
-- All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 \textcolor{red}{(CHECK!)} (R2)
+- All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 (R2)
 
 ## Where we sent kits
 
@@ -808,7 +808,7 @@ raw |>
 #| layout-ncol: 2
 #| fig-width: 4.6
 #| fig-height: 4.6
-kits_by_lsoa <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+kits_by_lsoa <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
                          name_repair = "minimal") |>
   filter(!is.na(treatment_kit)) |>
   count(lsoa, name = "n_kits")
@@ -870,7 +870,7 @@ lsoa_imd |>
 #| fig-height: 3.6
 # Among the 500 kit recipients (treatment_kit non-NA). valid_sample = number of
 # valid blood spots (0/1/2), confirmed against the DBS L/R validation columns.
-kit <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+kit <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
                 name_repair = "minimal") |>
   filter(!is.na(treatment_kit)) |>
   mutate(
@@ -910,7 +910,7 @@ kit |>
 #| include: false
 # Covariate descriptives for the 500 kit recipients. Two nested return outcomes:
 # returned = card came back & assessed (154); valid = >=1 valid blood spot (117).
-kitc <- read_csv("master_dataset_noaddr.csv", show_col_types = FALSE,
+kitc <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
                  name_repair = "minimal") |>
   filter(!is.na(treatment_kit)) |>
   mutate(
