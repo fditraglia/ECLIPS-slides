@@ -972,6 +972,29 @@ kitc |>
 ```
 
 
+## Returned kit vs. completed exposure survey \hfill \small \alert{(Preliminary)}
+
+\vspace{1em}
+
+```{r}
+#| label: kit-exposure-confusion
+#| results: asis
+# 2x2 of the two Phase II outcomes among all 500 kit recipients.
+cm <- table(
+  factor(if_else(kitc$returned, "Kit returned", "Kit not returned"),
+         levels = c("Kit returned", "Kit not returned")),
+  factor(if_else(kitc$exposure, "Survey completed", "Survey not completed"),
+         levels = c("Survey completed", "Survey not completed"))
+) |>
+  addmargins(FUN = list(Total = sum), quiet = TRUE)
+
+knitr::kable(cm, format = "latex", booktabs = TRUE,
+             col.names = c("Survey completed", "Survey not completed", "Total"))
+```
+
+\vspace{1em}
+\footnotesize Counts of the `r nrow(kitc)` kit recipients. `r kit_caption`
+
 ```{r}
 #| label: kit-covariate-prep
 #| include: false
@@ -1040,7 +1063,46 @@ imap_dfr(outc, \(col, lab) {
 ```
 
 
-## Housing Tenure and Education Predict Return Rates \hfill \small \alert{(Preliminary)} 
+## Valid spot given return, by disadvantage \hfill \small \alert{(Preliminary)}
+
+```{r}
+#| label: kit-valid-given-return
+#| fig-width: 7.5
+#| fig-height: 2.4
+# Among returned kits only: share with >=1 valid blood spot, by disadvantage.
+# (The earlier slides use all 500 recipients, conflating return and validity.)
+vr <- kitc |>
+  filter(returned) |>
+  group_by(disadv) |>
+  summarise(x = sum(valid), n = n(), .groups = "drop") |>
+  add_score_ci(x, n, scale = 100)
+
+vr_diff <- score_diff(
+  vr$x[vr$disadv == "Disadvantaged"],     vr$n[vr$disadv == "Disadvantaged"],
+  vr$x[vr$disadv == "Not disadvantaged"], vr$n[vr$disadv == "Not disadvantaged"])
+
+vr |>
+  mutate(label = paste0(disadv, "  (", x, " of ", n, ")")) |>
+  ggplot(aes(est, fct_rev(label))) +
+  geom_pointrange(aes(xmin = lo, xmax = hi), colour = COL_BLUE,
+                  fatten = 3, linewidth = 0.8) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1),
+                     limits = c(0, 100)) +
+  labs(x = paste0("Share of returned kits with >=1 valid spot (", ci_pct,
+                  " Wilson CI)"),
+       y = NULL,
+       caption = paste0(
+         "Difference (disadvantaged - not): ",
+         sprintf("%.1f", 100 * vr_diff$diff), " pp [",
+         sprintf("%.1f", 100 * vr_diff$lo), ", ",
+         sprintf("%.1f", 100 * vr_diff$hi), "], ", ci_pct,
+         " Newcombe interval. ", kit_caption)) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
+## Housing Tenure and Education Predict Return Rates \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-ses
@@ -1096,6 +1158,46 @@ bind_rows(
 - It was opened a few days ago we think? Ask Andrea
 - Perhaps we could present some very preliminary results?-->
 
+
+## Timing of kit returns \hfill \small \alert{(Preliminary)}
+
+```{r}
+#| label: kit-return-cdf
+#| fig-width: 7.5
+#| fig-height: 3.4
+# Cumulative lab receipts of returned blood-spot cards, by round, calendar
+# time (date_posted is empty in the lab file, so days-since-dispatch is not
+# computable per kit). Input to the window-close decision (ANALYSIS-TODO item
+# 10). Data flags recorded 2026-07-10, to raise with Andrea/Angela: 20 of the
+# 154 returned kits lack date_received; 3 rows have date_sampled after
+# date_received; one date_sampled reads 2026-09-03 (a future date).
+ret_dated <- kitc |>
+  filter(returned, !is.na(date_received)) |>
+  mutate(received = dmy(date_received),
+         round_lab = paste("Round", round))
+
+last_receipt <- max(ret_dated$received)
+
+ggplot(ret_dated, aes(received, colour = round_lab)) +
+  stat_ecdf(linewidth = 0.8, pad = FALSE) +
+  geom_vline(xintercept = last_receipt, linetype = "dashed", colour = "grey55") +
+  annotate("text", x = last_receipt, y = 0.15,
+           label = paste(" last receipt:", format(last_receipt, "%d %b %Y")),
+           hjust = 0, size = 3.2, colour = "grey30") +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y",
+               expand = expansion(mult = c(0.02, 0.18))) +
+  scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE)) +
+  labs(x = NULL, y = "Share of dated returns received", colour = NULL,
+       caption = paste0(nrow(ret_dated), " of the ", sum(kitc$returned),
+                        " returned kits carry a lab receipt date; the ",
+                        sum(kitc$returned) - nrow(ret_dated),
+                        " undated ones are not shown.")) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
 
 ## Returned letters
 
