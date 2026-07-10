@@ -1,8 +1,17 @@
 # Analysis to-do list
 
-Consolidated from Ludovica's slide feedback (#general, 2026-05-28, three posts), Frank's annotated re-post (2026-06-03, ts 1780496380.829809), and the items added by the 2026-07-04 investigation session. Organized by what each task waits on. Written 2026-07-04.
+Consolidated from Ludovica's slide feedback (#general, 2026-05-28, three posts), Frank's annotated re-post (2026-06-03, ts 1780496380.829809), and the items added by the 2026-07-04 investigation session. Organized by theme. Task numbers 1-14 are stable so they can be referred to across Slack and the slides.
 
-## A. Doable now (all inputs committed in ECLIPS-PAP)
+**Refreshed 2026-07-10.** The earlier version grouped tasks by which data-production step they were waiting on (Caner re-running Scripts 09/14, Caner running Script 25, the fixed master dataset, receiving the blood lead levels). Those steps have all completed, so the tasks are reorganized by theme below. What each former blocker produced, and its state in ECLIPS-PAP as of this refresh:
+
+- Scripts 09/14 re-run: `data/processed/combined-pseudonymized.csv` regenerated 2026-07-06; the drop-off fields (Progress, Finished, Duration, the twelve page-timer columns) are present in `master_dataset.csv`.
+- Script 25: `data/processed/oa-response-counts.csv` committed 2026-07-06 (`a985daa`).
+- Master dataset: `data/processed/master_dataset.csv` present; the merge row-explosion fix and the dropping of `mix_sent` are in (`3e7eb00`, `c721fe3`).
+- Blood lead levels: arriving. 154 rows carry a `CC-BLC_result` (left/right, µmol/L) and a `date_sampled` as of 2026-07-10; 2 rows carry a `venous_BLC`. The full set is pending the remaining kit returns; item 10 is the analysis that sets the close date for that window.
+
+The old Lasse adaptive-sampling simulation work (2025-03 DM thread) is from the design phase, predates the study going live, and is not part of this backlog; Lasse is off the project.
+
+## A. Intake and response-rate analyses (inputs committed)
 
 1. **Response rate by share eligible.** Does response rise with the LSOA eligible share, beyond the stratification? Scatter: each dot an LSOA, x = estimated eligible share (E_l), y = responses / letters sent. Weighted least squares (letters per LSOA vary enormously). Look for patterns by disadvantage. Inputs: `combined-pseudonymized2.csv`, `lsoa-reference-table.csv`, letters per LSOA from `addresses-and-treatments.csv`.
 2. **Back-of-envelope response rate per eligible household.** Same scatter, read as a rate: R / (E x L) intuition. Companion to item 1.
@@ -12,37 +21,36 @@ Consolidated from Ludovica's slide feedback (#general, 2026-05-28, three posts),
 
 5b. **Sampling-frame building evidence** (rebuilt 2026-07-04; extended 2026-07-05 to 397 rows with council decant schedules and press articles). Evidence on buildings that may not be ordinary households (care homes, student residences, demolition blocks) is compiled in ECLIPS-PAP `data/processed/building-evidence.csv` (one row per source record, attributed and dated; codebook alongside; sources in `data/raw/frame-quality/`). No classifications are made in the file: any analysis that excludes addresses must state its own rule. This is one input into response rates among eligible households; the census eligibility shares are the other. ECLIPS-PAP Script 26 (assigned to Caner 2026-07-05) will report responses from these buildings' postcodes; whole-LSOA bounds already cap the answer at 19 of 890 usable responses.
 
-## A2. Deck cleanup (from CODE-AUDIT-2026-07-04.md; do together with the group-B re-run)
+6. **Survey drop-off analysis** (Ludovica's request; the original motivation for the whole test-response cleanup). Who started the intake survey but did not finish; how far they got (Progress, Finished, Duration); which page they stalled on (the twelve page-timer columns); timing relative to mailing. These fields are available for non-usable rows in the regenerated pseudonymized files. Test rows are confirmed removed: Script 23 ran clean at Warwick on 2026-07-05 (16 + 5 removed, no survivors, both rounds; result recorded in the script header).
 
-- The stale-file issue (audit finding 1) mostly SELF-HEALS: the deck reads `combined-pseudonymized.csv` by name, and Caner's re-run regenerates that file correctly. After the re-run: re-render and update the four hardcoded Phase I flowchart numbers (1,624 started / 734 ineligible-or-no-consent / 148,376 no response / 55%).
-- Fix the `Non-White` flag in `responder-traits-imd` (qmd:756): "Rather not say" currently counts as Non-White (audit finding 3; Q4 shown 31.6%, correct 27.6%).
-- Reword the kit-allocation claim (qmd:802): "all KIT-ELIGIBLE disadvantaged got a kit; 168 of 176 (R2)" — confirm the 8 review-stage exclusions with Andrea (audit finding 2).
-- Refresh the "Categorizing letters" slide (qmd:1076): returns are final — 752, fully categorized, clustered in a handful of named buildings.
-- Comment the 05-25 master-vintage pin in the kit chunks; fix the exclusion-appendix double-count (5,521, not 5,955) if that slide is reused.
+## B. Spillover estimation (input committed)
 
-## B. Blocked on Caner re-running Scripts 09/14 (requested 2026-07-04; instructions confirmed 2026-07-05 — push all THREE files including combined-pseudonymized.csv, which the May 9 commit omitted)
+7. **Spillover estimation.** The design, estimating equation, prespecified choices, and MDEs are fully written up in `ECLIPS-PAP/saturation-spillover-design-note.md` (rewritten 2026-07-04 after adversarial review). The per-OA per-round count table (oa, round, n_started, n_usable) is committed: `ECLIPS-PAP/data/processed/oa-response-counts.csv`, produced by `scripts/25-count-responses-by-oa.R` with hard-stop checks that its totals match the pseudonymized data. MDEs: 7.4% (started) / 10.0% (usable) per +1 SD of saturation.
 
-6. **Survey drop-off analysis** (Ludovica's request; the original motivation for the whole test-response cleanup). Who started the intake survey but did not finish; how far they got (Progress, Finished, Duration); which page they stalled on (the twelve page-timer columns); timing relative to mailing. The re-run makes these fields available for non-usable rows in the pseudonymized files. Test rows are confirmed removed: Script 23 ran clean at Warwick on 2026-07-05 (16 + 5 removed, no survivors, both rounds; result recorded in the script header).
-
-## C. Blocked on Caner running Script 25 (committed and assigned 2026-07-05)
-
-7. **Spillover estimation.** The design, estimating equation, prespecified choices, and MDEs are fully written up in `ECLIPS-PAP/saturation-spillover-design-note.md` (rewritten 2026-07-04 after adversarial review). The one missing input, the per-OA per-round count table (oa, round, n_started, n_usable), now has a committed producer: ECLIPS-PAP `scripts/25-count-responses-by-oa.R`, with hard-stop checks that its totals match the pseudonymized data; Caner runs it and pushes `data/processed/oa-response-counts.csv`. MDEs: 7.4% (started) / 10.0% (usable) per +1 SD of saturation.
-
-## D. Blocked on the fixed master dataset (Andrea: merge-bug fix + mix_sent answer, requested 2026-07-04)
+## C. Kit and exposure-survey analyses (master dataset available)
 
 8. **Confusion matrix: returned kit x completed exposure survey.** Marked "easy, I'll do it."
 9. **Valid spot by disadvantage, conditional on returning the kit.** Currently the outcome conflates "returned and valid"; condition on return. Marked "easy, I'll do it."
-10. **CDF of kit returns by days since the kit was sent.** To pick the threshold for closing the kit-return window (how long until effectively 100% of returns are in).
+10. **CDF of kit returns by days since the kit was sent.** To pick the threshold for closing the kit-return window (how long until effectively 100% of returns are in). This also sets the close date for the blood-lead set in group D, which is still filling.
 
-## E. Blocked on receiving the blood lead levels (BLLs, from the lab via Angela)
+## D. Blood-lead analyses (data arriving; 154 analyzed samples as of 2026-07-10, full set pending remaining kit returns)
 
 11. **Seasonality in blood lead concentration** by sample date.
 12. **Correlate the two spots' BLC difference, and number of spots completed, with education.**
 13. **Confusion matrix / joint distribution of BLCs across a child's two blood spots.**
 14. **Model the lab corrections** — quantify measurement error; "corrections" means things like subtracting batch-level lead estimates.
 
+## Deck cleanup (from CODE-AUDIT-2026-07-04.md)
+
+- The stale-file issue (audit finding 1) mostly SELF-HEALS: the deck reads `combined-pseudonymized.csv` by name, and the re-run regenerates that file. After the re-run: re-render and update the four hardcoded Phase I flowchart numbers (1,624 started / 734 ineligible-or-no-consent / 148,376 no response / 55%). See the combined-pseudonymized note under Standing caveats before relying on this.
+- Fix the `Non-White` flag in `responder-traits-imd` (qmd:756): "Rather not say" currently counts as Non-White (audit finding 3; Q4 shown 31.6%, correct 27.6%).
+- Reword the kit-allocation claim (qmd:802): "all KIT-ELIGIBLE disadvantaged got a kit; 168 of 176 (R2)" — confirm the 8 review-stage exclusions with Andrea (audit finding 2).
+- Refresh the "Categorizing letters" slide (qmd:1076): returns are final — 752, fully categorized, clustered in a handful of named buildings.
+- Comment the 05-25 master-vintage pin in the kit chunks; fix the exclusion-appendix double-count (5,521, not 5,955) if that slide is reused.
+
 ## Standing caveats
 
-- Do not compute anything from `master_dataset.csv` until Andrea's merge fix is in and the `mix_sent` question (whether `824ae6af`/`47c36aaf` blood results are correctly attributed) is answered.
-- Small-cell identifiability constrains the response map (item 4) and any OA-level presentation (item 7's outputs).
-- Use `combined-pseudonymized2.csv`, never the stale `combined-pseudonymized.csv`; do not de-duplicate the identical non-usable rows (they are distinct respondents). Revisit this caveat as soon as Caner pushes the regenerated files (asked 2026-07-05): the regenerated `combined-pseudonymized.csv` should then be correct, and the deck reads it by name. The staleness plausibly originated when the May 9 commit (`196ebc3`) pushed the two round files but not the combined one.
+- **`combined-pseudonymized.csv` and `combined-pseudonymized2.csv` are two scripts' outputs, not competing versions** (reconciled 2026-07-10 from git history). `combined-pseudonymized.csv` is written by Script 14, the documented pseudonymized-release pipeline (commit `cdd7b96`, 2026-07-06 14:10), and the slides deck and `intake-survey-exploration.R` read it. `combined-pseudonymized2.csv` is written by `build_master_dataset.R` Step 1 as the input to `master_dataset.csv` (commit `3e7eb00`, 2026-07-06 15:31, the direct child of `cdd7b96`), and the current PAP analysis scripts read it (25, 27, spillover verification). Both are current as of the same 2026-07-06 rebuild. Their only content difference is one respondent (LSOA E01011462, Round 2, arm G, usable): the release file keeps the raw hash `c2142a2e`, the master-dataset file carries the remapped kit-mixup ID `eclips2mxs`. Every aggregate by LSOA / round / treatment / usable / demographics is identical, so items 1-2 (which name `...2.csv`) and the deck (which reads `combined-pseudonymized.csv`) both give the same answers; the distinction matters only for a join on `participant_id` to that person's kit/blood record, which lives in `master_dataset.csv`. Do not de-duplicate the identical non-usable rows in either file (they are distinct respondents).
+- **Open decision (carried over from the retired `NEXT-SESSION.md`):** whether to consolidate the two combined-pseudonymized files into one producer — having `build_master_dataset.R` read Script 14's `combined-pseudonymized.csv` and apply the kit-mixup relabel at the merge, so `combined-pseudonymized2.csv` can be dropped and the misleading name removed. Needs Andrea (her script) plus the analysis-script readers (25, 27, spillover) updated in lockstep. The kit mix-up itself is now documented in ECLIPS-PAP `data/processed/kit-mixup-correction.md`.
+- Small-cell identifiability constrains the response map (item 4) and any OA-level presentation (item 7's outputs). The OA-on-release decision is recorded in the ECLIPS-PAP codebooks (`473c77e`).
+- Do not report anything from `master_dataset.csv` in a way that presumes the blood-lead set is complete: 154 samples are analyzed as of 2026-07-10 and more kits are still returning (item 10 sets the close date).
