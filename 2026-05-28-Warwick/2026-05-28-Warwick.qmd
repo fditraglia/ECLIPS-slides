@@ -25,8 +25,16 @@ library(tidyverse)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       dev = "png", dpi = 300, fig.align = "center")
 
-raw <- read_csv("~/ECLIPS-PAP/data/processed/combined-pseudonymized.csv",
-                show_col_types = FALSE)
+raw_all <- read_csv("~/ECLIPS-PAP/data/processed/combined-pseudonymized.csv",
+                    show_col_types = FALSE)
+
+# Baseline response outcome: response within 45 days of the round's mailing
+# (Round 1: 2025-11-14 -> 2025-12-29; Round 2: 2026-01-22 -> 2026-03-08).
+# Round 1's survey stayed open until 2026-01-05; the 2 responses (1 usable)
+# received in the gap are excluded from every count and comparison below.
+raw <- raw_all |>
+  filter(!between(as.Date(EndDate),
+                  as.Date("2025-12-30"), as.Date("2026-01-21")))
 
 # Usable respondents only, with ordinal demographics coded as ordered factors
 # (short display labels for the long survey categories).
@@ -88,10 +96,50 @@ score_ci <- function(x, n, cl = 0.95) {
   c(est = 1000 * p, lo = 1000 * (ctr - half), hi = 1000 * (ctr + half))
 }
 
-mailed_per_cell <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
-                            show_col_types = FALSE) |>
-  mutate(cell = paste(house_type, treatment, sep = "_")) |>
-  count(cell, name = "n_mailed")
+# Newcombe (1998) hybrid score interval for a difference of proportions, built
+# from the two Wilson intervals. Returns proportions (not per-1,000).
+wilson_lohi <- function(x, n, cl = ci_level) {
+  z <- qnorm(1 - (1 - cl) / 2); p <- x / n
+  ctr <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
+  h   <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
+  c(lo = ctr - h, hi = ctr + h)
+}
+score_diff <- function(x1, n1, x0, n0) {
+  p1 <- x1 / n1; p0 <- x0 / n0; w1 <- wilson_lohi(x1, n1); w0 <- wilson_lohi(x0, n0)
+  d <- p1 - p0
+  tibble(diff = d,
+         lo = unname(d - sqrt((p1 - w1["lo"])^2 + (w0["hi"] - p0)^2)),
+         hi = unname(d + sqrt((w1["hi"] - p1)^2 + (p0 - w0["lo"])^2)))
+}
+
+# --- Input files, each read once; everything below derives from these ---
+
+# addr: one row per mailed address (both rounds, 150k). age_grp splits the
+# design's Non-Old into New (known >= 1967) vs Unknown (no EPC record).
+addr <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
+                 show_col_types = FALSE) |>
+  mutate(cell = paste(house_type, treatment, sep = "_"),
+         age_grp = case_when(house_type == "Old"              ~ "Old",
+                             !is.na(age_end) & age_end > 1966 ~ "New",
+                             TRUE                             ~ "Unknown"))
+
+lsoa_ref <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
+                     show_col_types = FALSE)
+lsoa_imd  <- lsoa_ref |> select(lsoa = lsoa21cd, imd_score)
+lsoa_elig <- lsoa_ref |> select(lsoa = lsoa21cd, E_l)
+
+# The same Old/New/Unknown split, from the response side's age_status column.
+age_grp_from_status <- function(x) {
+  recode(x, "Known Non-Old" = "New", "Unknown Age" = "Unknown")
+}
+
+mailed_per_cell <- addr |> count(cell, name = "n_mailed")
+
+# Quantities for the Phase I flowchart (interpolated into the tikz below).
+fmt <- function(x) format(x, big.mark = ",")
+n_mailed_total <- sum(mailed_per_cell$n_mailed)
+n_started      <- nrow(raw)
+n_usable       <- sum(raw$usable)
 
 cell_table <- mailed_per_cell |>
   left_join(
@@ -112,16 +160,7 @@ cell_table <- mailed_per_cell |>
 
 # --- IMD (deprivation) gradient: usable rate by IMD quintile ---
 # imd_score higher = more deprived; quintiles = equal fifths of the 488 Leeds LSOAs.
-lsoa_imd <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
-                     show_col_types = FALSE) |>
-  select(lsoa = lsoa21cd, imd_score)
-
-# age_grp splits the design's Non-Old into New (known >= 1967) vs Unknown (no EPC).
-addr_imd <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
-                     show_col_types = FALSE) |>
-  mutate(age_grp = case_when(house_type == "Old"                   ~ "Old",
-                             !is.na(age_end) & age_end > 1966       ~ "New",
-                             TRUE                                   ~ "Unknown")) |>
+addr_imd <- addr |>
   select(lsoa, treatment, age_grp) |>
   left_join(lsoa_imd, by = "lsoa")
 
@@ -135,8 +174,7 @@ imd_cells <- addr_imd |>
   count(q, age_grp, treatment, name = "mailed") |>
   left_join(
     raw |>
-      mutate(age_grp = recode(age_status, "Known Non-Old" = "New",
-                              "Unknown Age" = "Unknown")) |>
+      mutate(age_grp = age_grp_from_status(age_status)) |>
       select(lsoa, treatment = treatment_parsed, age_grp, usable) |>
       left_join(lsoa_imd, by = "lsoa") |>
       mutate(q = bin_imd(imd_score)) |>
@@ -162,11 +200,6 @@ imd_summary <- function(df, extra = character(0), outcome = "usable") {
 # Boundaries from ONS (BGC, OGL v3); see ../data/leeds-lsoa-2021-bgc-PROVENANCE.md.
 library(sf)
 leeds_geo <- st_read("../data/leeds-lsoa-2021-bgc.geojson", quiet = TRUE)
-
-# Estimated eligible share (E_l, the Hamilton sampling weight) per LSOA.
-lsoa_elig <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
-                      show_col_types = FALSE) |>
-  select(lsoa = lsoa21cd, E_l)
 
 # Letters mailed per LSOA across both rounds (addr_imd = one row per mailed address).
 letters_by_lsoa <- addr_imd |> count(lsoa, name = "n_letters")
@@ -205,6 +238,58 @@ plot_bar <- function(var, base = 12) {
     theme(panel.grid.major.y = element_blank(),
           panel.grid.minor = element_blank())
 }
+
+# --- Kit data: the 500 kit recipients, from the canonical master dataset ---
+# golden_envelope (0/1) is the kit-type randomization (the column formerly
+# named kit_type). valid_sample is NA for never-returned kits, so returned and
+# valid are defined to make never-returned FALSE, not NA. Two nested return
+# outcomes: returned = card came back & was lab-assessed; valid = >=1 valid
+# blood spot on the card.
+master <- read_csv("~/ECLIPS-PAP/data/processed/master_dataset.csv",
+                   show_col_types = FALSE, name_repair = "minimal")
+kitc <- master |>
+  filter(!is.na(treatment_kit)) |>
+  mutate(
+    kit_type = factor(golden_envelope, levels = c(0, 1),
+                      labels = c("Kit 0", "Kit 1")),
+    exposure = completed_exposure_survey == 1,
+    returned = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
+    valid    = !is.na(valid_sample) & valid_sample >= 1,
+    disadv = factor(if_else(disadvantaged, "Disadvantaged", "Not disadvantaged"),
+                    levels = c("Not disadvantaged", "Disadvantaged")),
+    tenure = factor(case_when(
+               str_starts(home, "Owned")            ~ "Owned",
+               str_detect(home, "private landlord") ~ "Rented (private)",
+               str_detect(home, "council")          ~ "Rented (council)"),
+             levels = c("Owned", "Rented (private)", "Rented (council)")),
+    educ = factor(case_when(
+             str_detect(highest_education, "Undergraduate|Postgraduate") ~ "Degree",
+             str_detect(highest_education, "age 18|Post-school")         ~ "A-level / vocational",
+             str_detect(highest_education, "age 16|No formal")           ~ "<=GCSE / none"),
+           levels = c("Degree", "A-level / vocational", "<=GCSE / none")),
+    inc = factor(case_when(
+            income %in% c("Under £15,000", "£15,000 - £24,999")        ~ "< £25k",
+            income %in% c("£25,000 - £34,999", "£35,000 - £49,999")    ~ "£25-50k",
+            income %in% c("£50,000 - £74,999", "£75,000 - £99,999")    ~ "£50-100k",
+            income %in% c("£100,000 - £149,999", "£150,000 and above") ~ "£100k+"),
+          levels = c("£100k+", "£50-100k", "£25-50k", "< £25k")),
+    worry = factor(worried_exposure,
+             levels = c("Not worried", "A little worried", "Quite worried", "Very worried")),
+    knew = factor(prior_lead_knowledge, levels = c("Yes", "No", "Not sure")),
+    letter = factor(treatment_parsed, levels = c("C", "G", "P"),
+             labels = c("Control", "Generalized", "Personalized")))
+
+kits_by_lsoa <- kitc |> count(lsoa, name = "n_kits")
+
+# Per-kit-type counts for the Phase II flowchart (interpolated into the tikz).
+kit2 <- kitc |>
+  group_by(kit_type) |>
+  summarise(n = n(), ret = sum(returned), val = sum(valid),
+            exp = sum(exposure), .groups = "drop")
+
+# Snapshot caveat shown on every kit-outcome slide.
+kit_caption <- paste0("Counts are a snapshot: kit returns are still arriving, and Round 2 kits ",
+                      "(400 of 500) were dispatched later than Round 1's (100).")
 ```
 
 # Overview
@@ -254,6 +339,9 @@ Blood-spot card came back and was lab-assessed (preliminary; deadline not yet sp
 ### Valid Sample
 One or more usable blood spot on the returned card
 
+\vspace{0.5em}
+\footnotesize Round 1's survey stayed open 7 days past its 45-day window; the 2 responses (1 usable) received in that period are excluded from every count in this deck. One exception, flagged where it appears: the Phase II flowchart shows the realized pool of 890 usable respondents from which kits were allocated.
+
 # 1 - Sampling Design
 
 ## Sampling Design: Data Sources
@@ -288,8 +376,7 @@ Merge LSOA-level demographics with Council Tax datai (by LSOA)
 #| label: lsoa-eligible-share-hist
 #| fig-width: 7
 #| fig-height: 3.5
-read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
-         show_col_types = FALSE) |>
+lsoa_ref |>
   mutate(elig_rate = households_0_9 / total_households) |>
   ggplot(aes(elig_rate)) +
   geom_histogram(bins = 40, fill = "#3B6E8F", colour = "white", linewidth = 0.1) +
@@ -299,7 +386,7 @@ read_csv("~/ECLIPS-PAP/data/processed/lsoa-reference-table.csv",
   theme(panel.grid.minor = element_blank())
 ```
 
-Estimated from 2021 Census (children aged 0--9), one observation per LSOA.
+From the 2021 Census: households whose youngest dependent child is aged 0--9, one observation per LSOA.
 
 
 ## Stratified Random Sampling to Improve Precision
@@ -308,8 +395,8 @@ Estimated from 2021 Census (children aged 0--9), one observation per LSOA.
 
 ### Eligibility
 - Letters sent to households without a child aged 1-6 are wasted
-- Approximate \# eligible from 2021 Census: 0-4 \& 5-9 bands
-- $E_\ell =$ (\# Eligible in LSOA $\ell$) / (Total \# Eligible)
+- Census proxy: households whose youngest dependent child is aged 0--9 (2021 Census, table RM006)
+- $E_\ell =$ (\# such households in LSOA $\ell$) / (Total across Leeds)
 - Send $N \times E_\ell$ letters to LSOA $\ell$ (Hamilton allocation)
 
 
@@ -445,16 +532,16 @@ Send 30k letters; wait 45 days; \# of responses $R_1$ determines letters sent in
 \centering
 \begin{tikzpicture}[scale=0.5, every node/.style={align=center}]
   \node (addr) [draw] {All Leeds Residential Addresses \\ $370{,}666$};
-  \node (letters) [draw, below of=addr, node distance=2.2cm] {Send $150{,}000$ Letters};
-  \node (started) [draw, below right of=letters, node distance=2.7cm] {$1{,}645$ \\ Started Survey};
-  \node (noresp) [draw, dashed, below left of=letters, node distance=2.7cm] {No Response \\ $148{,}355$};
-  \node (usable) [draw, below right of=started, node distance=2.7cm] {$890$ \\ Usable Responses};
-  \node (drop) [draw, dashed, below left of=started, node distance=2.7cm] {Ineligible or \\ no consent \\ $755$};
+  \node (letters) [draw, below of=addr, node distance=2.2cm] {Send `r fmt(n_mailed_total)` Letters};
+  \node (started) [draw, below right of=letters, node distance=2.7cm] {`r fmt(n_started)` \\ Started Survey};
+  \node (noresp) [draw, dashed, below left of=letters, node distance=2.7cm] {No Response \\ `r fmt(n_mailed_total - n_started)`};
+  \node (usable) [draw, below right of=started, node distance=2.7cm] {`r fmt(n_usable)` \\ Usable Responses};
+  \node (drop) [draw, dashed, below left of=started, node distance=2.7cm] {Ineligible or \\ no consent \\ `r fmt(n_started - n_usable)`};
 
   \draw[->] (addr) -- (letters) node[midway, right]{Stratified Random Sample ($\approx 40\%$)};
-  \draw[->] (letters) -- (started) node[midway, right]{$1.1\%$};
+  \draw[->] (letters) -- (started) node[midway, right]{`r sprintf("%.1f", 100 * n_started / n_mailed_total)`\%};
   \draw[->, dashed] (letters) -- (noresp);
-  \draw[->] (started) -- (usable) node[midway, right]{$54\%$};
+  \draw[->] (started) -- (usable) node[midway, right]{`r sprintf("%.0f", 100 * n_usable / n_started)`\%};
   \draw[->, dashed] (started) -- (drop);
 \end{tikzpicture}
 
@@ -496,18 +583,12 @@ cell_table |>
 #| fig-height: 3.6
 age_levels <- c("Old", "New", "Unknown")
 
-age_tab <- read_csv("~/ECLIPS-PAP/data/processed/addresses-and-treatments.csv",
-                    show_col_types = FALSE) |>
-  mutate(age_grp = case_when(
-    house_type == "Old"               ~ "Old",
-    !is.na(age_end) & age_end > 1966  ~ "New",
-    TRUE                              ~ "Unknown")) |>
+age_tab <- addr |>
   count(age_grp, treatment, name = "mailed") |>
   left_join(
     raw |>
       filter(usable) |>
-      mutate(age_grp = recode(age_status,
-                              "Known Non-Old" = "New", "Unknown Age" = "Unknown")) |>
+      mutate(age_grp = age_grp_from_status(age_status)) |>
       count(age_grp, treatment = treatment_parsed, name = "usable"),
     by = c("age_grp", "treatment")
   ) |>
@@ -577,46 +658,51 @@ cell_table |>
 ```
 
 
-## Treatment effects *starting* the survey. \hfill \small \alert{(Preliminary)}
+## Treatment effects: starting vs. usable response \hfill \small \alert{(Preliminary)}
 
 ```{r}
-#| label: click-diff-forest
+#| label: treatment-diff-forest
 #| fig-width: 8
-#| fig-height: 2.8
-library(PropCIs)
+#| fig-height: 3.4
+# Differences in response rates between randomized letter arms, for both
+# outcomes: started (clicked) and usable. Newcombe score intervals (score_diff
+# in setup); returns proportions, scaled to per-1,000 below.
+contrast_levels <- c("Non-Old:  G − C", "Old:  G − C", "Old:  P − C",
+                     "Old:  P − G", "Old:  (G + P) − C")
 
-diff_ci <- function(x1, n1, x2, n2, cl = ci_level) {
-  d <- diffscoreci(x1, n1, x2, n2, conf.level = cl)
-  c(est = 1000 * (x1 / n1 - x2 / n2),
-    lo  = 1000 * d$conf.int[1], hi = 1000 * d$conf.int[2])
+contrast_tbl <- function(outcome_col) {
+  v <- cell_table |>
+    transmute(cell = as.character(cell), x = .data[[outcome_col]], n = n_mailed)
+  g <- function(c, col) v[[col]][v$cell == c]
+  tribble(
+    ~contrast,            ~x1,                            ~n1,                            ~x0,                  ~n0,
+    "Non-Old:  G − C",    g("NonOld_G", "x"),             g("NonOld_G", "n"),             g("NonOld_C", "x"),   g("NonOld_C", "n"),
+    "Old:  G − C",        g("Old_G", "x"),                g("Old_G", "n"),                g("Old_C", "x"),      g("Old_C", "n"),
+    "Old:  P − C",        g("Old_P", "x"),                g("Old_P", "n"),                g("Old_C", "x"),      g("Old_C", "n"),
+    "Old:  P − G",        g("Old_P", "x"),                g("Old_P", "n"),                g("Old_G", "x"),      g("Old_G", "n"),
+    "Old:  (G + P) − C",  g("Old_G", "x") + g("Old_P", "x"), g("Old_G", "n") + g("Old_P", "n"), g("Old_C", "x"), g("Old_C", "n"))
 }
 
-v <- cell_table |> transmute(cell = as.character(cell), n_responded, n_mailed)
-get <- function(c, col) v[[col]][v$cell == c]
-
-tibble(
-  contrast = c("Non-Old:  G − C", "Old:  (G + P) − C"),
-  x1 = c(get("NonOld_G", "n_responded"),
-         get("Old_G", "n_responded") + get("Old_P", "n_responded")),
-  n1 = c(get("NonOld_G", "n_mailed"),
-         get("Old_G", "n_mailed") + get("Old_P", "n_mailed")),
-  x2 = c(get("NonOld_C", "n_responded"), get("Old_C", "n_responded")),
-  n2 = c(get("NonOld_C", "n_mailed"),    get("Old_C", "n_mailed"))
-) |>
+bind_rows(
+  contrast_tbl("n_responded") |> mutate(outcome = "Started (clicked)"),
+  contrast_tbl("n_usable")    |> mutate(outcome = "Usable response")) |>
   rowwise() |>
-  mutate(d = list(diff_ci(x1, n1, x2, n2))) |>
+  mutate(d = list(score_diff(x1, n1, x0, n0))) |>
   ungroup() |>
-  mutate(est = map_dbl(d, "est"), lo = map_dbl(d, "lo"), hi = map_dbl(d, "hi"),
-         contrast = factor(contrast, levels = rev(c("Non-Old:  G − C",
-                                                    "Old:  (G + P) − C")))) |>
-  ggplot(aes(x = est, y = contrast)) +
+  unnest(d) |>
+  mutate(across(c(diff, lo, hi), \(x) 1000 * x),
+         contrast = factor(contrast, levels = rev(contrast_levels)),
+         outcome  = factor(outcome, levels = c("Started (clicked)",
+                                               "Usable response"))) |>
+  ggplot(aes(x = diff, y = contrast)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
   geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.15, linewidth = 0.8,
                  colour = "#3B6E8F") +
-  geom_point(size = 3.2, colour = "#3B6E8F") +
-  labs(x = "Difference in clicks per 1,000 letters  (treatment − control)",
-       y = NULL,
-       caption = paste0(ci_pct, " Newcombe score intervals")) +
+  geom_point(size = 3, colour = "#3B6E8F") +
+  facet_wrap(~ outcome) +
+  labs(x = "Difference per 1,000 letters mailed", y = NULL,
+       caption = paste0(ci_pct, " Newcombe score intervals. ",
+                        "(G + P) pools the arms sharing the generalized-risk text: the P letter contains both messages.")) +
   theme_minimal(base_size = 13) +
   theme(panel.grid.major.y = element_blank(),
         plot.caption = element_text(size = 9, colour = "grey40"))
@@ -626,7 +712,7 @@ tibble(
 
 ## Intake Survey: Awareness of Lead
 
-\small Usable respondents ($N = 890$); counts shown on bars.
+\small Usable respondents ($N = `r nrow(surv)`$); counts shown on bars.
 
 ```{r}
 #| label: lead-awareness
@@ -713,7 +799,7 @@ imd_summary(imd_cells, "age_grp", outcome = "usable") |>
 \footnotesize \hyperlink{appx-imd-treat}{\beamergotobutton{Does the gradient differ by treatment?}}
 \hyperlink{appx-click-age}{\beamergotobutton{Clicks version of this plot}}
 
-## More Old housing in deprived LSOAs areas
+## More Old housing in deprived LSOAs
 
 ```{r}
 #| label: stock-composition
@@ -730,9 +816,11 @@ addr_imd |>
                                "Unknown" = "#7A7A7A")) +
   scale_y_continuous(labels = scales::label_percent()) +
   labs(x = "IMD quintile  (left = least deprived)",
-       y = "Share of letters mailed", fill = NULL) +
+       y = "Share of letters mailed", fill = NULL,
+       caption = "Within each LSOA, letters were split across housing ages in proportion to the address stock, so this is also the stock's composition.") +
   theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom",
+        plot.caption = element_text(size = 9, colour = "grey40"))
 ```
 
 ## Responder demographics versus LSOA deprivation
@@ -753,7 +841,8 @@ raw |>
                                        "Rented from a private landlord"),
     `Low education`      = highest_education %in%
       c("No formal qualifications", "Education up to age 16 (GCSE or equivalent)"),
-    `Non-White`          = !is.na(ethnicity) & !str_starts(ethnicity, "White")
+    `Non-White`          = !is.na(ethnicity) & !str_starts(ethnicity, "White") &
+                             ethnicity != "Rather not say"
   ) |>
   filter(!is.na(q)) |>
   select(q, all_of(ind_levels)) |>
@@ -772,7 +861,9 @@ raw |>
   geom_pointrange(aes(ymin = lo, ymax = hi), colour = "#3B6E8F", size = 0.3) +
   facet_wrap(~ indicator, nrow = 1) +
   labs(x = "IMD quintile  (left = least deprived)",
-       y = "% of responders", caption = ci_caption) +
+       y = "% of responders",
+       caption = paste0(ci_caption,
+                        ". Item non-response ('Rather not say' / blank) counts toward denominators, not numerators.")) +
   theme_minimal(base_size = 11) +
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
 ```
@@ -799,7 +890,10 @@ raw |>
 
 ### Across rounds (realized)
 - Split 500 kits across rounds $\propto$ expected responses; selection probabilities round-specific
-- All disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 (R2)
+- All *kit-eligible* disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 of 176 (R2)
+<!-- The 8 R2 disadvantaged non-recipients appear to have been excluded at the
+     Script 15/16 GP / bounced-email review (their selection_probability is 1.0);
+     to be confirmed with Andrea. See CODE-AUDIT-2026-07-04.md finding 2. -->
 
 ## Where we sent kits
 
@@ -808,12 +902,7 @@ raw |>
 #| layout-ncol: 2
 #| fig-width: 4.6
 #| fig-height: 4.6
-kits_by_lsoa <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
-                         name_repair = "minimal") |>
-  filter(!is.na(treatment_kit)) |>
-  count(lsoa, name = "n_kits")
-
-# (left) Where kits went: choropleth of kits sent per LSOA.
+# (left) Where kits went: choropleth of kits sent per LSOA (kits_by_lsoa from setup).
 leeds_geo |>
   left_join(kits_by_lsoa, by = c("LSOA21CD" = "lsoa")) |>
   ggplot(aes(fill = n_kits)) +
@@ -841,18 +930,18 @@ lsoa_imd |>
 ## Phase II: Collecting Blood Samples
 
 \centering
-\resizebox{\textwidth}{!}{%
+\resizebox{0.82\textwidth}{!}{%
 \begin{tikzpicture}[every node/.style={draw, align=center, font=\small}, >=stealth]
-  \node (usable) at (0,0)     {890 Usable Respondents};
-  \node (kits)   at (0,-1.6)  {Send 500 Kits + Exposure Survey};
-  \node (kitA)   at (-3.3,-3.4) {Kit A \\ 251};
-  \node (kitB)   at (3.3,-3.4)  {Kit B \\ 249};
-  \node (Aret)   at (-5,-5.7)  {Returned kit \\ 79 (31\%) \\ {\scriptsize 59 valid}};
-  \node (Asur)   at (-1.7,-5.7) {Exposure survey \\ 82 (33\%)};
-  \node (Bret)   at (1.7,-5.7)  {Returned kit \\ 75 (30\%) \\ {\scriptsize 58 valid}};
-  \node (Bsur)   at (5,-5.7)   {Exposure survey \\ 74 (30\%)};
+  \node (usable) at (0,0)     {`r sum(master$usable)` Usable Respondents};
+  \node (kits)   at (0,-1.6)  {Send `r nrow(kitc)` Kits + Exposure Survey};
+  \node (kitA)   at (-3.3,-3.4) {Kit A \\ `r kit2$n[1]`};
+  \node (kitB)   at (3.3,-3.4)  {Kit B \\ `r kit2$n[2]`};
+  \node (Aret)   at (-5,-5.7)  {Returned kit \\ `r kit2$ret[1]` (`r round(100 * kit2$ret[1] / kit2$n[1])`\%) \\ {\scriptsize `r kit2$val[1]` valid}};
+  \node (Asur)   at (-1.7,-5.7) {Exposure survey \\ `r kit2$exp[1]` (`r round(100 * kit2$exp[1] / kit2$n[1])`\%)};
+  \node (Bret)   at (1.7,-5.7)  {Returned kit \\ `r kit2$ret[2]` (`r round(100 * kit2$ret[2] / kit2$n[2])`\%) \\ {\scriptsize `r kit2$val[2]` valid}};
+  \node (Bsur)   at (5,-5.7)   {Exposure survey \\ `r kit2$exp[2]` (`r round(100 * kit2$exp[2] / kit2$n[2])`\%)};
 
-  \draw[->] (usable) -- (kits) node[midway, right, draw=none]{re-balanced $\approx 56\%$};
+  \draw[->] (usable) -- (kits) node[midway, right, draw=none]{re-balanced $\approx `r round(100 * nrow(kitc) / sum(master$usable))`$\%};
   \draw[->] (kits) -- (kitA);
   \draw[->] (kits) -- (kitB) node[midway, above right, draw=none]{randomize kit type};
   \draw[->] (kitA) -- (Aret);
@@ -862,84 +951,48 @@ lsoa_imd |>
 \end{tikzpicture}%
 }
 
+\footnotesize Kits were allocated from the realized usable pool (`r sum(master$usable)`, one more than the 45-day-outcome count used elsewhere in this deck). `r kit_caption`
+
 ## No Effect of Kit Type \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-type-forest
 #| fig-width: 7.5
 #| fig-height: 3.6
-# Among the 500 kit recipients (treatment_kit non-NA). valid_sample = number of
-# valid blood spots (0/1/2), confirmed against the DBS L/R validation columns.
-kit <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
-                name_repair = "minimal") |>
-  filter(!is.na(treatment_kit)) |>
-  mutate(
-    kit_type = factor(kit_type, levels = c(0, 1), labels = c("Kit 0", "Kit 1")),
-    `Completed exposure survey` = completed_exposure_survey == 1,
-    `Returned a kit (any)`      = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
-    `Returned >=1 valid spot`   = valid_sample >= 1)
+# Among the 500 kit recipients (kitc from setup; outcomes defined there).
+outcomes <- c("Completed exposure survey" = "exposure",
+              "Returned a kit (any)"      = "returned",
+              "Returned >=1 valid spot"   = "valid")
 
-outcomes <- c("Completed exposure survey", "Returned a kit (any)",
-              "Returned >=1 valid spot")
-
-kit |>
-  pivot_longer(all_of(outcomes), names_to = "outcome", values_to = "hit") |>
+kitc |>
+  pivot_longer(all_of(unname(outcomes)), names_to = "outcome", values_to = "hit") |>
+  mutate(outcome = factor(outcome, levels = rev(unname(outcomes)),
+                          labels = rev(names(outcomes)))) |>
   group_by(kit_type, outcome) |>
   summarise(x = sum(hit), n = n(), .groups = "drop") |>
   rowwise() |>
   mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
   ungroup() |>
   mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
-         hi = map_dbl(ci, "hi") / 10,
-         outcome = factor(outcome, levels = rev(outcomes))) |>
+         hi = map_dbl(ci, "hi") / 10) |>
   ggplot(aes(est, outcome, colour = kit_type)) +
   geom_pointrange(aes(xmin = lo, xmax = hi),
                   position = position_dodge(width = 0.55), fatten = 2.5) +
   scale_x_continuous(labels = scales::label_percent(scale = 1),
                      limits = c(0, NA)) +
   scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
-  labs(x = paste0("Share of 500 kit recipients (", ci_pct, " Wilson CI)"),
-       y = NULL) +
+  labs(x = paste0("Share of ", nrow(kitc), " kit recipients (", ci_pct, " Wilson CI)"),
+       y = NULL, caption = kit_caption) +
   theme_minimal(base_size = 12) +
-  theme(panel.grid.minor = element_blank(), legend.position = "top")
+  theme(panel.grid.minor = element_blank(), legend.position = "top",
+        plot.caption = element_text(size = 8, colour = "grey40"))
 ```
 
 
 ```{r}
 #| label: kit-covariate-prep
 #| include: false
-# Covariate descriptives for the 500 kit recipients. Two nested return outcomes:
-# returned = card came back & assessed (154); valid = >=1 valid blood spot (117).
-kitc <- read_csv("2026-05-25-master_dataset_noaddr.csv", show_col_types = FALSE,
-                 name_repair = "minimal") |>
-  filter(!is.na(treatment_kit)) |>
-  mutate(
-    returned = !is.na(DBSLvalidation) | !is.na(DBSRvalidation),
-    valid    = valid_sample >= 1,
-    disadv = factor(if_else(disadvantaged, "Disadvantaged", "Not disadvantaged"),
-                    levels = c("Not disadvantaged", "Disadvantaged")),
-    tenure = factor(case_when(
-               str_starts(home, "Owned")            ~ "Owned",
-               str_detect(home, "private landlord") ~ "Rented (private)",
-               str_detect(home, "council")          ~ "Rented (council)"),
-             levels = c("Owned", "Rented (private)", "Rented (council)")),
-    educ = factor(case_when(
-             str_detect(highest_education, "Undergraduate|Postgraduate") ~ "Degree",
-             str_detect(highest_education, "age 18|Post-school")         ~ "A-level / vocational",
-             str_detect(highest_education, "age 16|No formal")           ~ "<=GCSE / none"),
-           levels = c("Degree", "A-level / vocational", "<=GCSE / none")),
-    inc = factor(case_when(
-            income %in% c("Under £15,000", "£15,000 - £24,999")        ~ "< £25k",
-            income %in% c("£25,000 - £34,999", "£35,000 - £49,999")    ~ "£25-50k",
-            income %in% c("£50,000 - £74,999", "£75,000 - £99,999")    ~ "£50-100k",
-            income %in% c("£100,000 - £149,999", "£150,000 and above") ~ "£100k+"),
-          levels = c("£100k+", "£50-100k", "£25-50k", "< £25k")),
-    worry = factor(worried_exposure,
-             levels = c("Not worried", "A little worried", "Quite worried", "Very worried")),
-    knew = factor(prior_lead_knowledge, levels = c("Yes", "No", "Not sure")),
-    letter = factor(treatment_parsed, levels = c("C", "G", "P"),
-             labels = c("Control", "Generalized", "Personalized")))
-
+# Covariate descriptives for the 500 kit recipients (kitc built in setup).
 # Rate + Wilson CI (in %) for one categorical var, both return outcomes; drop tiny cats.
 kit_forest <- function(var, min_n = 10) {
   kitc |>
@@ -963,9 +1016,11 @@ plot_kit_forest <- function(df) {
                     position = position_dodge(width = 0.55), fatten = 2.2) +
     scale_x_continuous(labels = scales::label_percent(scale = 1), limits = c(0, NA)) +
     scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
-    labs(x = paste0("Share of kit recipients (", ci_pct, " Wilson CI)"), y = NULL) +
+    labs(x = paste0("Share of kit recipients (", ci_pct, " Wilson CI)"), y = NULL,
+         caption = kit_caption) +
     theme_minimal(base_size = 12) +
-    theme(panel.grid.minor = element_blank(), legend.position = "top")
+    theme(panel.grid.minor = element_blank(), legend.position = "top",
+          plot.caption = element_text(size = 8, colour = "grey40"))
 }
 ```
 
@@ -984,21 +1039,7 @@ plot_kit_forest(kit_forest("disadv"))
 #| label: kit-return-disadv-diff
 #| fig-width: 7.5
 #| fig-height: 2.6
-# Score (Newcombe) interval for a difference of proportions, built from the two
-# Wilson score intervals. Contrast = disadvantaged - not disadvantaged.
-wilson_lohi <- function(x, n) {
-  z <- qnorm(1 - (1 - ci_level) / 2); p <- x / n
-  ctr <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
-  h   <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
-  c(lo = ctr - h, hi = ctr + h)
-}
-score_diff <- function(x1, n1, x0, n0) {
-  p1 <- x1 / n1; p0 <- x0 / n0; w1 <- wilson_lohi(x1, n1); w0 <- wilson_lohi(x0, n0)
-  d <- p1 - p0
-  tibble(diff = d,
-         lo = unname(d - sqrt((p1 - w1["lo"])^2 + (w0["hi"] - p0)^2)),
-         hi = unname(d + sqrt((w1["hi"] - p1)^2 + (p0 - w0["lo"])^2)))
-}
+# Newcombe interval (score_diff in setup); contrast = disadvantaged - not.
 outc <- c("Returned any kit" = "returned", ">=1 valid spot" = "valid")
 imap_dfr(outc, \(col, lab) {
   d1 <- filter(kitc, disadv == "Disadvantaged")
@@ -1073,11 +1114,11 @@ bind_rows(
 - Perhaps we could present some very preliminary results?-->
 
 
-## Categorizing letters
+## Returned letters
 
-- A few hundred outreach letters were returned to Warwick
-- We have an RA going through all of them; hasn't finished yet 
-- Check to make sure that LSOA characteristics aren't related to returned letters; correct response rate estimates
+- 752 of 150,000 letters (0.50\%) came back undeliverable; the set is final and fully categorized (`returned-letters.csv` in ECLIPS-PAP, with codebook)
+- Returns cluster in a handful of named buildings (demolition blocks, student residences) and skew by deprivation: 0.87\% of letters in the most-deprived quintile vs 0.21\% in the least
+- Denominator effect is below reporting precision: overall usable rate 5.93 per 1,000 mailed vs 5.96 net of returns (Script 27); no IMD quintile moves more than 2.5\% relatively
 
 
 # Appendix
@@ -1090,12 +1131,11 @@ bind_rows(
 
 
 \vspace{-2em }
-### Addresses Excluded 
-- Hotels / student residences: 936
-- Vacant properties: 931
-- Missing UPRN: 73 
-- Missing LSOA: 524
-- Missing postcode (after EPC fallback): 3491
+### Addresses Excluded: 5,521 total (categories overlap)
+- Unconventional households: 1,863 (hotels / student residences 936, vacant properties 931, with overlapping tags)
+- Missing LSOA: 524 (no valid UPRN $\Rightarrow$ no ONS lookup; includes 73 rows with no UPRN at all)
+- Missing postcode (after EPC fallback): 3,491
+- Known gap: the residence keyword list missed $\approx$ 87 mailed student addresses (Kirkstall Brewery, Lupton Flats); see `sampling-frame-codebook.md`
 
 ### De-duplication
 - After exclusion, 18 UPRNs appear *exactly twice*  
@@ -1333,7 +1373,7 @@ leeds_geo |>
   theme(legend.position = "right")
 ```
 
-\small $y/n$ per LSOA: 0--23 per 1,000, with 117 of 488 LSOAs at zero --- mostly sampling noise.
+\small $y/n$ per LSOA: 0--`r round(max(eb_lsoa$raw))` per 1,000, with `r sum(eb_lsoa$y == 0)` of `r nrow(eb_lsoa)` LSOAs at zero --- mostly sampling noise.
 
 ## Usable response rate by LSOA: empirical-Bayes shrunk
 
@@ -1352,7 +1392,7 @@ leeds_geo |>
   theme(legend.position = "right")
 ```
 
-\small Posterior means --- *own scale (4--9) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
+\small Posterior means --- *own scale (`r round(min(eb_lsoa$post))`--`r round(max(eb_lsoa$post))`) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
 
 ## Clicking: deprivation gradient by housing age \hfill \small \alert{(Preliminary)}
 
