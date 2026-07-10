@@ -1189,7 +1189,9 @@ ggplot(ret_dated, aes(received, colour = round_lab)) +
                expand = expansion(mult = c(0.02, 0.18))) +
   scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE)) +
   labs(x = NULL, y = "Share of dated returns received", colour = NULL,
-       caption = paste0(nrow(ret_dated), " of the ", sum(kitc$returned),
+       caption = paste0("Blood-results data through the 2026-06-22 lab export ",
+                        "(the master dataset's current blood input); later receipts, if any, are not yet in the data. ",
+                        nrow(ret_dated), " of the ", sum(kitc$returned),
                         " returned kits carry a lab receipt date; the ",
                         sum(kitc$returned) - nrow(ret_dated),
                         " undated ones are not shown.")) +
