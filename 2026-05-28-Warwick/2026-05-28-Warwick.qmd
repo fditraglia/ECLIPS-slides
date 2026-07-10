@@ -25,6 +25,15 @@ library(tidyverse)
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
                       dev = "png", dpi = 300, fig.align = "center")
 
+# Shared constants: colors, treatment labels, gradient palettes
+COL_BLUE    <- "#3B6E8F"   # primary
+COL_ORANGE  <- "#B5651D"   # secondary
+COL_ORANGE2 <- "#C46A1B"   # kit-type accent
+TREAT_LABELS <- c(C = "Control", G = "Generalized", P = "Personalized")
+AGE_COLS   <- c("Old" = COL_ORANGE, "New" = COL_BLUE, "Unknown" = "#7A7A7A")
+TREAT_COLS <- c("Control" = "#666666", "Generalized" = COL_BLUE,
+                "Personalized" = COL_ORANGE)
+
 raw_all <- read_csv("~/ECLIPS-PAP/data/processed/combined-pseudonymized.csv",
                     show_col_types = FALSE)
 
@@ -87,23 +96,34 @@ ci_level   <- 0.95                                 # CI level used everywhere be
 ci_pct     <- paste0(round(100 * ci_level), "%")   # e.g. "95%"
 ci_caption <- paste0("Bars: ", ci_pct, " Wilson score intervals")
 
-# Point = observed rate (x/n); bounds = Wilson score interval (= prop.test, no cc).
-score_ci <- function(x, n, cl = 0.95) {
-  z <- qnorm(1 - (1 - cl) / 2)
-  p <- x / n
-  ctr  <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
-  half <- (z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))) / (1 + z^2 / n)
-  c(est = 1000 * p, lo = 1000 * (ctr - half), hi = 1000 * (ctr + half))
-}
-
-# Newcombe (1998) hybrid score interval for a difference of proportions, built
-# from the two Wilson intervals. Returns proportions (not per-1,000).
+# Wilson score interval bounds, as proportions (= prop.test, no cc).
 wilson_lohi <- function(x, n, cl = ci_level) {
   z <- qnorm(1 - (1 - cl) / 2); p <- x / n
   ctr <- (p + z^2 / (2 * n)) / (1 + z^2 / n)
   h   <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / (1 + z^2 / n)
   c(lo = ctr - h, hi = ctr + h)
 }
+
+# Point = observed rate (x/n) with Wilson bounds; scale = 1000 for per-1,000
+# rates, 100 for percent.
+score_ci <- function(x, n, cl = 0.95, scale = 1000) {
+  w <- wilson_lohi(x, n, cl)
+  c(est = scale * x / n, lo = scale * w[["lo"]], hi = scale * w[["hi"]])
+}
+
+# Attach est/lo/hi columns for x successes of n trials (Wilson, ci_level).
+add_score_ci <- function(df, x, n, scale = 1000) {
+  df |>
+    rowwise() |>
+    mutate(ci = list(score_ci({{ x }}, {{ n }}, cl = ci_level, scale = scale))) |>
+    ungroup() |>
+    mutate(est = map_dbl(ci, "est"), lo = map_dbl(ci, "lo"),
+           hi = map_dbl(ci, "hi")) |>
+    select(-ci)
+}
+
+# Newcombe (1998) hybrid score interval for a difference of proportions, built
+# from the two Wilson intervals. Returns proportions (not per-1,000).
 score_diff <- function(x1, n1, x0, n0) {
   p1 <- x1 / n1; p0 <- x0 / n0; w1 <- wilson_lohi(x1, n1); w0 <- wilson_lohi(x0, n0)
   d <- p1 - p0
@@ -130,7 +150,7 @@ lsoa_elig <- lsoa_ref |> select(lsoa = lsoa21cd, E_l)
 
 # The same Old/New/Unknown split, from the response side's age_status column.
 age_grp_from_status <- function(x) {
-  recode(x, "Known Non-Old" = "New", "Unknown Age" = "Unknown")
+  case_match(x, "Known Non-Old" ~ "New", "Unknown Age" ~ "Unknown", .default = x)
 }
 
 mailed_per_cell <- addr |> count(cell, name = "n_mailed")
@@ -149,14 +169,31 @@ cell_table <- mailed_per_cell |>
       summarise(n_responded = n(), n_usable = sum(usable), .groups = "drop"),
     by = "cell"
   ) |>
-  rowwise() |>
-  mutate(ci = list(score_ci(n_usable, n_mailed, cl = ci_level))) |>
-  ungroup() |>
-  mutate(per_1000 = map_dbl(ci, "est"),
-         lo = map_dbl(ci, "lo"),
-         hi = map_dbl(ci, "hi"),
-         cell = factor(cell, levels = cell_levels)) |>
+  add_score_ci(n_usable, n_mailed) |>
+  mutate(cell = factor(cell, levels = cell_levels)) |>
   arrange(cell)
+
+# Forest plot of per-cell rates (est/lo/hi): Old/Non-Old rows, house colour.
+cell_forest <- function(df, xlab) {
+  df |>
+    mutate(
+      house  = if_else(str_starts(as.character(cell), "Old"), "Old", "Non-Old"),
+      letter = unname(TREAT_LABELS[str_sub(as.character(cell), start = -1L)]),
+      label  = factor(paste0(house, ": ", letter),
+                      levels = rev(c("Non-Old: Control", "Non-Old: Generalized",
+                                     "Old: Control", "Old: Generalized",
+                                     "Old: Personalized")))
+    ) |>
+    ggplot(aes(x = est, y = label, colour = house)) +
+    geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.22, linewidth = 0.7) +
+    geom_point(size = 3) +
+    scale_colour_manual(values = c("Old" = COL_ORANGE, "Non-Old" = COL_BLUE)) +
+    labs(x = xlab, y = NULL, colour = NULL, caption = ci_caption) +
+    theme_minimal(base_size = 13) +
+    theme(legend.position = "none",
+          panel.grid.major.y = element_blank(),
+          plot.caption = element_text(size = 9, colour = "grey40"))
+}
 
 # --- IMD (deprivation) gradient: usable rate by IMD quintile ---
 # imd_score higher = more deprived; quintiles = equal fifths of the 488 Leeds LSOAs.
@@ -190,16 +227,43 @@ imd_summary <- function(df, extra = character(0), outcome = "usable") {
   df |>
     group_by(across(all_of(c("q", extra)))) |>
     summarise(mailed = sum(mailed), num = sum(.data[[outcome]]), .groups = "drop") |>
-    rowwise() |>
-    mutate(ci = list(score_ci(num, mailed, cl = ci_level))) |>
-    ungroup() |>
-    mutate(rate = map_dbl(ci, "est"), lo = map_dbl(ci, "lo"), hi = map_dbl(ci, "hi"))
+    add_score_ci(num, mailed) |>
+    rename(rate = est)
+}
+
+# IMD-quintile gradient: line + pointrange per colour group (rate/lo/hi).
+gradient_plot <- function(df, colour_var, palette, ylab, caption = ci_caption) {
+  ggplot(df, aes(x = q, y = rate, colour = .data[[colour_var]],
+                 group = .data[[colour_var]])) +
+    geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
+    geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
+                    position = position_dodge(0.12)) +
+    scale_colour_manual(values = palette) +
+    labs(x = "IMD quintile  (left = least deprived)", y = ylab, colour = NULL,
+         caption = caption) +
+    theme_minimal(base_size = 13) +
+    theme(legend.position = "bottom",
+          plot.caption = element_text(size = 9, colour = "grey40"),
+          plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
 }
 
 # --- Map data: Leeds LSOA (2021) boundaries + per-LSOA quantities ---
 # Boundaries from ONS (BGC, OGL v3); see ../data/leeds-lsoa-2021-bgc-PROVENANCE.md.
 library(sf)
 leeds_geo <- st_read("../data/leeds-lsoa-2021-bgc.geojson", quiet = TRUE)
+
+# Leeds LSOA choropleth (continuous fill); df carries an lsoa column.
+lsoa_map <- function(df, col, legend, option = "mako") {
+  leeds_geo |>
+    left_join(df, by = c("LSOA21CD" = "lsoa")) |>
+    ggplot(aes(fill = .data[[col]])) +
+    geom_sf(colour = "white", linewidth = 0.03) +
+    scale_fill_viridis_c(option = option, direction = -1, name = legend,
+                         na.value = "grey85") +
+    coord_sf(datum = NA) +
+    theme_void(base_size = 13) +
+    theme(legend.position = "right")
+}
 
 # Letters mailed per LSOA across both rounds (addr_imd = one row per mailed address).
 letters_by_lsoa <- addr_imd |> count(lsoa, name = "n_letters")
@@ -230,7 +294,7 @@ plot_bar <- function(var, base = 12) {
     count(val, .drop = FALSE) |>
     filter(n > 0) |>
     ggplot(aes(x = n, y = fct_rev(val))) +
-    geom_col(fill = "#3B6E8F") +
+    geom_col(fill = COL_BLUE) +
     geom_text(aes(label = n), hjust = -0.25, size = 3) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
     labs(x = NULL, y = NULL) +
@@ -276,8 +340,8 @@ kitc <- master |>
     worry = factor(worried_exposure,
              levels = c("Not worried", "A little worried", "Quite worried", "Very worried")),
     knew = factor(prior_lead_knowledge, levels = c("Yes", "No", "Not sure")),
-    letter = factor(treatment_parsed, levels = c("C", "G", "P"),
-             labels = c("Control", "Generalized", "Personalized")))
+    letter = factor(TREAT_LABELS[treatment_parsed],
+                    levels = unname(TREAT_LABELS)))
 
 kits_by_lsoa <- kitc |> count(lsoa, name = "n_kits")
 
@@ -364,7 +428,7 @@ Merge Postcode, OA, LSOA and MSOA with Council Tax data (by UPRN)
 Merge Housing age (use latest certificate) with Council Tax data (by UPRN)
 
 ### Census Data (2021) at LSOA level 
-Merge LSOA-level demographics with Council Tax datai (by LSOA)
+Merge LSOA-level demographics with Council Tax data (by LSOA)
 
 ### Exclusion / De-duplication
 \hyperlink{appx-exclusion}{\beamergotobutton{See appendix slide for details}}
@@ -379,7 +443,7 @@ Merge LSOA-level demographics with Council Tax datai (by LSOA)
 lsoa_ref |>
   mutate(elig_rate = households_0_9 / total_households) |>
   ggplot(aes(elig_rate)) +
-  geom_histogram(bins = 40, fill = "#3B6E8F", colour = "white", linewidth = 0.1) +
+  geom_histogram(bins = 40, fill = COL_BLUE, colour = "white", linewidth = 0.1) +
   scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
   labs(x = "Eligible HH in LSOA / Total HH in LSOA", y = "Number of LSOAs") +
   theme_minimal(base_size = 12) +
@@ -420,19 +484,12 @@ From the 2021 Census: households whose youngest dependent child is aged 0--9, on
 library(patchwork)
 
 # (left) Where letters went: choropleth of letters mailed per LSOA (raw counts).
-leeds_geo |>
-  left_join(letters_by_lsoa, by = c("LSOA21CD" = "lsoa")) |>
-  ggplot(aes(fill = n_letters)) +
-  geom_sf(colour = "white", linewidth = 0.03) +
-  scale_fill_viridis_c(option = "mako", direction = -1, name = "Letters",
-                       na.value = "grey85") +
-  coord_sf(datum = NA) +
-  theme_void(base_size = 12) +
-  theme(legend.position = "right", legend.key.width = unit(0.3, "cm"))
+lsoa_map(letters_by_lsoa, "n_letters", "Letters") +
+  theme(legend.key.width = unit(0.3, "cm"))
 
 # (right) Why: letters per LSOA vs estimated eligible share, with marginals.
-d   <- letters_by_lsoa |> inner_join(lsoa_elig, by = "lsoa")
-col <- "#3B6E8F"
+d   <- letters_by_lsoa |> left_join(lsoa_elig, by = "lsoa")
+col <- COL_BLUE
 
 main <- ggplot(d, aes(E_l, n_letters)) +
   geom_abline(slope = sum(d$n_letters), intercept = 0,
@@ -464,17 +521,19 @@ top + plot_spacer() + main + right +
 #| fig-width: 7.5
 #| fig-height: 3.8
 letters_by_lsoa |>
-  inner_join(lsoa_imd, by = "lsoa") |>
+  left_join(lsoa_imd, by = "lsoa") |>
   mutate(share = n_letters / sum(n_letters)) |>
   ggplot(aes(imd_score, share)) +
-  geom_point(alpha = 0.45, colour = "#3B6E8F", size = 1.1) +
-  geom_smooth(method = "lm", formula = y ~ x, colour = "#B5651D",
-              fill = "#B5651D", alpha = 0.15, linewidth = 0.7) +
+  geom_point(alpha = 0.45, colour = COL_BLUE, size = 1.1) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = COL_ORANGE,
+              fill = COL_ORANGE, alpha = 0.15, linewidth = 0.7) +
   scale_y_continuous(labels = scales::label_percent(accuracy = 0.1)) +
   labs(x = "IMD score  (higher = more deprived)",
-       y = "Share of all letters sent") +
+       y = "Share of all letters sent",
+       caption = "Follows mechanically from the eligibility weighting: letters were allocated proportional to E_l, and families with young children concentrate in more deprived LSOAs.") +
   theme_minimal(base_size = 13) +
-  theme(panel.grid.minor = element_blank())
+  theme(panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
 ```
 
 
@@ -553,26 +612,7 @@ Send 30k letters; wait 45 days; \# of responses $R_1$ determines letters sent in
 #| label: cell-rate-forest
 #| fig-width: 8
 #| fig-height: 3.9
-cell_table |>
-  mutate(
-    house  = if_else(str_starts(as.character(cell), "Old"), "Old", "Non-Old"),
-    letter = recode(str_sub(as.character(cell), start = -1L),
-                    C = "Control", G = "Generalized", P = "Personalized"),
-    label  = factor(paste0(house, ": ", letter),
-                    levels = rev(c("Non-Old: Control", "Non-Old: Generalized",
-                                   "Old: Control", "Old: Generalized",
-                                   "Old: Personalized")))
-  ) |>
-  ggplot(aes(x = per_1000, y = label, colour = house)) +
-  geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.22, linewidth = 0.7) +
-  geom_point(size = 3) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "Non-Old" = "#3B6E8F")) +
-  labs(x = "Usable responses per 1,000 letters mailed", y = NULL, colour = NULL,
-       caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "none",
-        panel.grid.major.y = element_blank(),
-        plot.caption = element_text(size = 9, colour = "grey40"))
+cell_forest(cell_table, "Usable responses per 1,000 letters mailed")
 ```
 
 ## Highest response from Old (pre 1967); lowest from Unknown (no EPC)
@@ -592,26 +632,17 @@ age_tab <- addr |>
       count(age_grp, treatment = treatment_parsed, name = "usable"),
     by = c("age_grp", "treatment")
   ) |>
-  rowwise() |>
-  mutate(ci = list(score_ci(usable, mailed, cl = ci_level))) |>
-  ungroup() |>
-  mutate(per_1000 = map_dbl(ci, "est"),
-         lo = map_dbl(ci, "lo"),
-         hi = map_dbl(ci, "hi"),
-         age_grp = factor(age_grp, levels = rev(age_levels)),
-         treatment = recode(treatment, C = "Control", G = "Generalized",
-                            P = "Personalized"),
-         treatment = factor(treatment,
-                            levels = c("Control", "Generalized", "Personalized")))
+  add_score_ci(usable, mailed) |>
+  mutate(age_grp = factor(age_grp, levels = rev(age_levels)),
+         treatment = factor(TREAT_LABELS[treatment],
+                            levels = unname(TREAT_LABELS)))
 
-ggplot(age_tab, aes(x = per_1000, y = age_grp, colour = treatment)) +
+ggplot(age_tab, aes(x = est, y = age_grp, colour = treatment)) +
   geom_hline(yintercept = 2.5, linetype = "dashed", colour = "grey55") +
   geom_errorbarh(aes(xmin = lo, xmax = hi),
                  position = position_dodge(width = 0.6), height = 0.2, linewidth = 0.6) +
   geom_point(position = position_dodge(width = 0.6), size = 2.8) +
-  scale_colour_manual(values = c("Control" = "#666666",
-                                 "Generalized" = "#3B6E8F",
-                                 "Personalized" = "#B5651D")) +
+  scale_colour_manual(values = TREAT_COLS) +
   labs(x = "Usable responses per 1,000 letters mailed", y = NULL, colour = NULL,
        caption = paste0("dashed line = design Old/Non-Old cut; ", ci_caption)) +
   theme_minimal(base_size = 13) +
@@ -630,31 +661,9 @@ ggplot(age_tab, aes(x = per_1000, y = age_grp, colour = treatment)) +
 #| fig-width: 8
 #| fig-height: 3.4
 cell_table |>
-  rowwise() |>
-  mutate(ci = list(score_ci(n_responded, n_mailed, cl = ci_level))) |>
-  ungroup() |>
-  mutate(
-    click  = map_dbl(ci, "est"),
-    clo    = map_dbl(ci, "lo"),
-    chi    = map_dbl(ci, "hi"),
-    house  = if_else(str_starts(as.character(cell), "Old"), "Old", "Non-Old"),
-    letter = recode(str_sub(as.character(cell), start = -1L),
-                    C = "Control", G = "Generalized", P = "Personalized"),
-    label  = factor(paste0(house, ": ", letter),
-                    levels = rev(c("Non-Old: Control", "Non-Old: Generalized",
-                                   "Old: Control", "Old: Generalized",
-                                   "Old: Personalized")))
-  ) |>
-  ggplot(aes(x = click, y = label, colour = house)) +
-  geom_errorbarh(aes(xmin = clo, xmax = chi), height = 0.22, linewidth = 0.7) +
-  geom_point(size = 3) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "Non-Old" = "#3B6E8F")) +
-  labs(x = "Any response (clicked / started) per 1,000 letters mailed",
-       y = NULL, colour = NULL, caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "none",
-        panel.grid.major.y = element_blank(),
-        plot.caption = element_text(size = 9, colour = "grey40"))
+  select(cell, n_responded, n_mailed) |>
+  add_score_ci(n_responded, n_mailed) |>
+  cell_forest("Any response (clicked / started) per 1,000 letters mailed")
 ```
 
 
@@ -697,8 +706,8 @@ bind_rows(
   ggplot(aes(x = diff, y = contrast)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
   geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.15, linewidth = 0.8,
-                 colour = "#3B6E8F") +
-  geom_point(size = 3, colour = "#3B6E8F") +
+                 colour = COL_BLUE) +
+  geom_point(size = 3, colour = COL_BLUE) +
   facet_wrap(~ outcome) +
   labs(x = "Difference per 1,000 letters mailed", y = NULL,
        caption = paste0(ci_pct, " Newcombe score intervals. ",
@@ -757,8 +766,8 @@ plot_bar("ethnicity") + ggtitle("Ethnicity")
 #| fig-height: 3.3
 imd_summary(imd_cells) |>
   ggplot(aes(x = q, y = rate, group = 1)) +
-  geom_line(colour = "#3B6E8F", linewidth = 0.7) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), colour = "#3B6E8F", size = 0.5) +
+  geom_line(colour = COL_BLUE, linewidth = 0.7) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), colour = COL_BLUE, size = 0.5) +
   labs(x = "IMD quintile  (left = least deprived)",
        y = "Usable per 1,000", caption = ci_caption) +
   theme_minimal(base_size = 13) +
@@ -782,18 +791,7 @@ imd_summary(imd_cells) |>
 #| fig-height: 3.3
 imd_summary(imd_cells, "age_grp", outcome = "usable") |>
   mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
-  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.12)) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
-                                 "Unknown" = "#7A7A7A")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Usable per 1,000", colour = NULL, caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+  gradient_plot("age_grp", AGE_COLS, "Usable per 1,000")
 ```
 
 \footnotesize \hyperlink{appx-imd-treat}{\beamergotobutton{Does the gradient differ by treatment?}}
@@ -812,7 +810,7 @@ addr_imd |>
   mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
   ggplot(aes(x = q, y = n, fill = age_grp)) +
   geom_col(position = "fill", width = 0.8) +
-  scale_fill_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
+  scale_fill_manual(values = c("Old" = COL_ORANGE, "New" = COL_BLUE,
                                "Unknown" = "#7A7A7A")) +
   scale_y_continuous(labels = scales::label_percent()) +
   labs(x = "IMD quintile  (left = least deprived)",
@@ -849,16 +847,11 @@ raw |>
   pivot_longer(-q, names_to = "indicator", values_to = "flag") |>
   group_by(indicator, q) |>
   summarise(x = sum(flag, na.rm = TRUE), n = sum(!is.na(flag)), .groups = "drop") |>
-  rowwise() |>
-  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
-  ungroup() |>
-  mutate(pct = map_dbl(ci, "est") / 10,    # score_ci is per-1,000; /10 -> percent
-         lo  = map_dbl(ci, "lo") / 10,
-         hi  = map_dbl(ci, "hi") / 10,
-         indicator = factor(indicator, levels = ind_levels)) |>
-  ggplot(aes(x = q, y = pct, group = 1)) +
-  geom_line(colour = "#3B6E8F", linewidth = 0.5) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), colour = "#3B6E8F", size = 0.3) +
+  add_score_ci(x, n, scale = 100) |>
+  mutate(indicator = factor(indicator, levels = ind_levels)) |>
+  ggplot(aes(x = q, y = est, group = 1)) +
+  geom_line(colour = COL_BLUE, linewidth = 0.5) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), colour = COL_BLUE, size = 0.3) +
   facet_wrap(~ indicator, nrow = 1) +
   labs(x = "IMD quintile  (left = least deprived)",
        y = "% of responders",
@@ -891,9 +884,10 @@ raw |>
 ### Across rounds (realized)
 - Split 500 kits across rounds $\propto$ expected responses; selection probabilities round-specific
 - All *kit-eligible* disadvantaged got a kit: 100 kits / 49 disadvantaged (R1); 400 kits / 168 of 176 (R2)
-<!-- The 8 R2 disadvantaged non-recipients appear to have been excluded at the
-     Script 15/16 GP / bounced-email review (their selection_probability is 1.0);
-     to be confirmed with Andrea. See CODE-AUDIT-2026-07-04.md finding 2. -->
+<!-- The 8 R2 disadvantaged non-recipients were excluded at the Script 15/16
+     review gate: 6 could not provide a verifiable GP, 2 had bounced emails.
+     Confirmed by Andrea in #general 2026-06-09 (thread ts 1781003461.772679)
+     and recorded per participant in master_dataset.csv kit_review_note. -->
 
 ## Where we sent kits
 
@@ -903,25 +897,18 @@ raw |>
 #| fig-width: 4.6
 #| fig-height: 4.6
 # (left) Where kits went: choropleth of kits sent per LSOA (kits_by_lsoa from setup).
-leeds_geo |>
-  left_join(kits_by_lsoa, by = c("LSOA21CD" = "lsoa")) |>
-  ggplot(aes(fill = n_kits)) +
-  geom_sf(colour = "white", linewidth = 0.03) +
-  scale_fill_viridis_c(option = "mako", direction = -1, name = "Kits",
-                       na.value = "grey85") +
-  coord_sf(datum = NA) +
-  theme_void(base_size = 12) +
-  theme(legend.position = "right", legend.key.width = unit(0.3, "cm"))
+lsoa_map(kits_by_lsoa, "n_kits", "Kits") +
+  theme(legend.key.width = unit(0.3, "cm"))
 
 # (right) Kits sent per LSOA vs deprivation (all 488 LSOAs; 0 if none).
 lsoa_imd |>
   left_join(kits_by_lsoa, by = "lsoa") |>
   mutate(n_kits = replace_na(n_kits, 0L)) |>
   ggplot(aes(imd_score, n_kits)) +
-  geom_jitter(width = 0, height = 0.18, alpha = 0.4, colour = "#3B6E8F",
+  geom_jitter(width = 0, height = 0.18, alpha = 0.4, colour = COL_BLUE,
               size = 1.1) +
-  geom_smooth(method = "lm", formula = y ~ x, colour = "#B5651D",
-              fill = "#B5651D", alpha = 0.15, linewidth = 0.7) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = COL_ORANGE,
+              fill = COL_ORANGE, alpha = 0.15, linewidth = 0.7) +
   labs(x = "IMD score  (higher = more deprived)", y = "Kits sent in LSOA") +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank())
@@ -970,17 +957,13 @@ kitc |>
                           labels = rev(names(outcomes)))) |>
   group_by(kit_type, outcome) |>
   summarise(x = sum(hit), n = n(), .groups = "drop") |>
-  rowwise() |>
-  mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
-  ungroup() |>
-  mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
-         hi = map_dbl(ci, "hi") / 10) |>
+  add_score_ci(x, n, scale = 100) |>
   ggplot(aes(est, outcome, colour = kit_type)) +
   geom_pointrange(aes(xmin = lo, xmax = hi),
                   position = position_dodge(width = 0.55), fatten = 2.5) +
   scale_x_continuous(labels = scales::label_percent(scale = 1),
                      limits = c(0, NA)) +
-  scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
+  scale_colour_manual(values = c(COL_BLUE, COL_ORANGE2), name = NULL) +
   labs(x = paste0("Share of ", nrow(kitc), " kit recipients (", ci_pct, " Wilson CI)"),
        y = NULL, caption = kit_caption) +
   theme_minimal(base_size = 12) +
@@ -1003,11 +986,7 @@ kit_forest <- function(var, min_n = 10) {
     group_by(level = .data[[var]], outcome) |>
     summarise(x = sum(hit), n = n(), .groups = "drop") |>
     filter(n >= min_n) |>
-    rowwise() |>
-    mutate(ci = list(score_ci(x, n, cl = ci_level))) |>
-    ungroup() |>
-    mutate(est = map_dbl(ci, "est") / 10, lo = map_dbl(ci, "lo") / 10,
-           hi = map_dbl(ci, "hi") / 10)
+    add_score_ci(x, n, scale = 100)
 }
 
 plot_kit_forest <- function(df) {
@@ -1015,7 +994,7 @@ plot_kit_forest <- function(df) {
     geom_pointrange(aes(xmin = lo, xmax = hi),
                     position = position_dodge(width = 0.55), fatten = 2.2) +
     scale_x_continuous(labels = scales::label_percent(scale = 1), limits = c(0, NA)) +
-    scale_colour_manual(values = c("#3B6E8F", "#C46A1B"), name = NULL) +
+    scale_colour_manual(values = c(COL_BLUE, COL_ORANGE2), name = NULL) +
     labs(x = paste0("Share of kit recipients (", ci_pct, " Wilson CI)"), y = NULL,
          caption = kit_caption) +
     theme_minimal(base_size = 12) +
@@ -1051,7 +1030,7 @@ imap_dfr(outc, \(col, lab) {
          across(c(diff, lo, hi), \(x) 100 * x)) |>
   ggplot(aes(diff, outcome)) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
-  geom_pointrange(aes(xmin = lo, xmax = hi), colour = "#3B6E8F",
+  geom_pointrange(aes(xmin = lo, xmax = hi), colour = COL_BLUE,
                   fatten = 3, linewidth = 0.8) +
   labs(x = "Disadvantaged - not disadvantaged (percentage points)", y = NULL,
        caption = paste0(ci_pct, " Newcombe score interval")) +
@@ -1103,7 +1082,11 @@ bind_rows(
          panel = factor(panel, levels = c("Worried about lead?",
                                           "Knew about lead beforehand?"))) |>
   plot_kit_forest() +
-  facet_grid(panel ~ ., scales = "free_y", space = "free_y")
+  facet_grid(panel ~ ., scales = "free_y", space = "free_y") +
+  labs(caption = paste0(
+    sum(kitc$worried_exposure %in% c("Not sure", "Rather not say")),
+    " recipients answering 'Not sure' / 'Rather not say' on worry are omitted from the top panel. ",
+    kit_caption))
 ```
 
 
@@ -1193,7 +1176,7 @@ dens <- function(df, ttl, fillcol, xlab = NULL) {
 }
 
 dens(eng, "England — 33,755 LSOAs", "grey65") /
-  dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", "#B5651D",
+  dens(filter(eng, lsoa %in% lsoa_imd$lsoa), "Leeds — 488 LSOAs", COL_ORANGE,
        xlab = "IMD score  (higher = more deprived)")
 ```
 
@@ -1272,22 +1255,10 @@ ggplot(leeds_lsoa, aes(fill = quintile)) +
 imd_cells |>
   filter(age_grp == "Old") |>
   imd_summary("treatment") |>
-  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
-                            P = "Personalized")) |>
-  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.12)) +
-  scale_colour_manual(values = c("Control" = "#666666",
-                                 "Generalized" = "#3B6E8F",
-                                 "Personalized" = "#B5651D")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Usable per 1,000", colour = NULL,
-       caption = paste0("Old houses only; ", ci_caption)) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+  mutate(treatment = factor(TREAT_LABELS[treatment],
+                            levels = unname(TREAT_LABELS))) |>
+  gradient_plot("treatment", TREAT_COLS, "Usable per 1,000",
+                caption = paste0("Old houses only; ", ci_caption))
 ```
 
 \footnotesize \hyperlink{appx-click-treat}{\beamergotobutton{Clicks version of this plot}}
@@ -1325,9 +1296,9 @@ xmax <- max(eb_lsoa$raw)
 
 funnel <- ggplot(eb_lsoa) +
   geom_segment(aes(x = raw, xend = post, y = 1, yend = 0),
-               colour = "#3B6E8F", alpha = 0.12, linewidth = 0.2) +
-  geom_point(aes(raw,  1), colour = "#B5651D", size = 0.5, alpha = 0.5) +
-  geom_point(aes(post, 0), colour = "#3B6E8F", size = 0.5, alpha = 0.5) +
+               colour = COL_BLUE, alpha = 0.12, linewidth = 0.2) +
+  geom_point(aes(raw,  1), colour = COL_ORANGE, size = 0.5, alpha = 0.5) +
+  geom_point(aes(post, 0), colour = COL_BLUE, size = 0.5, alpha = 0.5) +
   annotate("text", x = 0, y = 1, label = "raw  y/n", hjust = 0, vjust = -1.1, size = 3.3) +
   annotate("text", x = 0, y = 0, label = "shrunk",   hjust = 0, vjust = 2.1,  size = 3.3) +
   scale_x_continuous(limits = c(0, xmax)) +
@@ -1339,7 +1310,7 @@ funnel <- ggplot(eb_lsoa) +
 prior <- tibble(rate = seq(0, xmax, length.out = 400)) |>
   mutate(dens = dbeta(rate / 1000, eb_a, eb_b))
 distp <- ggplot(prior, aes(rate, dens)) +
-  geom_area(fill = "#3B6E8F", alpha = 0.85) +
+  geom_area(fill = COL_BLUE, alpha = 0.85) +
   scale_x_continuous(limits = c(0, xmax)) +
   labs(x = "Usable per 1,000", y = NULL) +
   theme_minimal(base_size = 12) +
@@ -1363,14 +1334,7 @@ funnel / distp + plot_layout(heights = c(1.1, 1))
 #| fig-width: 6
 #| fig-height: 4.2
 #| out-width: 62%
-leeds_geo |>
-  left_join(eb_lsoa, by = c("LSOA21CD" = "lsoa")) |>
-  ggplot(aes(fill = raw)) +
-  geom_sf(colour = "white", linewidth = 0.02) +
-  scale_fill_viridis_c(option = "rocket", direction = -1, name = "Usable\nper 1,000") +
-  coord_sf(datum = NA) +
-  theme_void(base_size = 13) +
-  theme(legend.position = "right")
+lsoa_map(eb_lsoa, "raw", "Usable\nper 1,000", option = "rocket")
 ```
 
 \small $y/n$ per LSOA: 0--`r round(max(eb_lsoa$raw))` per 1,000, with `r sum(eb_lsoa$y == 0)` of `r nrow(eb_lsoa)` LSOAs at zero --- mostly sampling noise.
@@ -1382,14 +1346,7 @@ leeds_geo |>
 #| fig-width: 6
 #| fig-height: 4.2
 #| out-width: 62%
-leeds_geo |>
-  left_join(eb_lsoa, by = c("LSOA21CD" = "lsoa")) |>
-  ggplot(aes(fill = post)) +
-  geom_sf(colour = "white", linewidth = 0.02) +
-  scale_fill_viridis_c(option = "mako", direction = -1, name = "Usable\nper 1,000") +
-  coord_sf(datum = NA) +
-  theme_void(base_size = 13) +
-  theme(legend.position = "right")
+lsoa_map(eb_lsoa, "post", "Usable\nper 1,000")
 ```
 
 \small Posterior means --- *own scale (`r round(min(eb_lsoa$post))`--`r round(max(eb_lsoa$post))`) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
@@ -1406,18 +1363,7 @@ leeds_geo |>
 #| fig-height: 3.3
 imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
   mutate(age_grp = factor(age_grp, levels = c("Old", "New", "Unknown"))) |>
-  ggplot(aes(x = q, y = rate, colour = age_grp, group = age_grp)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.45,
-                  position = position_dodge(0.12)) +
-  scale_colour_manual(values = c("Old" = "#B5651D", "New" = "#3B6E8F",
-                                 "Unknown" = "#7A7A7A")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Clicks per 1,000", colour = NULL, caption = ci_caption) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+  gradient_plot("age_grp", AGE_COLS, "Clicks per 1,000")
 ```
 
 ## Clicking: does the gradient differ by treatment? (Old) \hfill \small \alert{(Preliminary)}
@@ -1433,20 +1379,8 @@ imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
 imd_cells |>
   filter(age_grp == "Old") |>
   imd_summary("treatment", outcome = "clicks") |>
-  mutate(treatment = recode(treatment, C = "Control", G = "Generalized",
-                            P = "Personalized")) |>
-  ggplot(aes(x = q, y = rate, colour = treatment, group = treatment)) +
-  geom_line(linewidth = 0.6, position = position_dodge(0.12)) +
-  geom_pointrange(aes(ymin = lo, ymax = hi), size = 0.4,
-                  position = position_dodge(0.12)) +
-  scale_colour_manual(values = c("Control" = "#666666",
-                                 "Generalized" = "#3B6E8F",
-                                 "Personalized" = "#B5651D")) +
-  labs(x = "IMD quintile  (left = least deprived)",
-       y = "Clicks per 1,000", colour = NULL,
-       caption = paste0("Old houses only; ", ci_caption)) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom",
-        plot.caption = element_text(size = 9, colour = "grey40"),
-        plot.margin = margin(t = 10, r = 8, b = 4, l = 6))
+  mutate(treatment = factor(TREAT_LABELS[treatment],
+                            levels = unname(TREAT_LABELS))) |>
+  gradient_plot("treatment", TREAT_COLS, "Clicks per 1,000",
+                caption = paste0("Old houses only; ", ci_caption))
 ```

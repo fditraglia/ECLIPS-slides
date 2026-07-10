@@ -52,9 +52,9 @@ caption is honest and the `PropCIs` dependency is dropped. (Alternative: just re
 line 619 as "Miettinen–Nurminen.")
 
 RESPONSE:
-  decision:
-  action:
-  notes:
+  decision: ACCEPT
+  action:   done 2026-07-10 (commit c4b20c6): both difference slides use the hand-rolled score_diff (now defined once in setup); PropCIs dropped.
+  notes:    The differences slide also now shows the usable outcome alongside clicks.
 
 ## C. "Lower response rate in more deprived LSOAs" overstates a non-monotone gradient  ·  severity: MISLEADING TITLE
 `2026-05-28-Warwick.qmd` line ~664  (chunk `usable-imd-marginal`)
@@ -69,9 +69,9 @@ Proposed fix: soften the title (e.g. "Response rate tends to fall in more depriv
 LSOAs") or annotate the non-monotonicity. Editorial call — your wording.
 
 RESPONSE:
-  decision:
-  action:
-  notes:
+  decision: REJECT
+  action:   leave as is (Frank, 2026-07-10)
+  notes:    Endpoints separate cleanly and the plot shows the non-monotonicity itself.
 
 ## D. "Letters sent vs deprivation" is mechanically determined by the eligibility rule  ·  severity: MISLEADING FRAMING
 `2026-05-28-Warwick.qmd` lines ~379–391  (chunk `letters-vs-deprivation`)
@@ -87,9 +87,9 @@ one line stating this is the deprivation footprint of the eligibility weighting.
 Editorial call.
 
 RESPONSE:
-  decision:
-  action:
-  notes:
+  decision: ACCEPT
+  action:   done 2026-07-10: caption added stating the slope follows mechanically from the eligibility weighting (E_l); title unchanged.
+  notes:    Frank chose the caption over a retitle.
 
 ## E. Responder-traits flags fold NA + "Rather not say" into the negative  ·  severity: MINOR INCONSISTENCY
 `2026-05-28-Warwick.qmd` lines ~751–756  (chunk `responder-traits-imd`)
@@ -104,9 +104,9 @@ Proposed fix: either exclude RNS/NA from the denominator
 (`n = sum(!is.na(flag) & answered)`), or state that nonresponse is treated as baseline.
 
 RESPONSE:
-  decision:
-  action:
-  notes:
+  decision: ACCEPT (second option)
+  action:   done 2026-07-10: caption states item non-response counts toward denominators, not numerators; the Non-White numerator no longer counts "Rather not say" (audit 2026-07-04 finding 3).
+  notes:    Denominator convention kept for all four flags.
 
 ---
 
@@ -119,8 +119,8 @@ differ mainly in the x-aesthetic + axis label. Extract e.g.
 visually consistent.
 
 RESPONSE:
-  decision:
-  action:
+  decision: ACCEPT (partial)
+  action:   done 2026-07-10: cell_forest(df, xlab) in setup serves cell-rate-forest and click-rate-forest. kit-type-forest kept separate (dodged pointrange by kit type on a percent scale — genuinely different aesthetics).
   notes:
 
 ## G. Collapse duplicated map blocks into one helper  ·  severity: STYLE
@@ -129,8 +129,8 @@ RESPONSE:
 `eb_map(col, option)` helper dedupes it.
 
 RESPONSE:
-  decision:
-  action:
+  decision: ACCEPT (partial)
+  action:   done 2026-07-10: lsoa_map(df, col, legend, option) in setup serves both EB maps plus the letters and kits maps. leeds-imd-map kept separate (discrete brewer scale).
   notes:
 
 ## H. Collapse duplicated gradient plots into one helper  ·  severity: STYLE
@@ -139,8 +139,8 @@ repeat the same ~12-line line/pointrange/dodge/theme stanza. One
 `gradient_plot(df, colour_var, outcome, ylab)` helper removes ~3 copies.
 
 RESPONSE:
-  decision:
-  action:
+  decision: ACCEPT
+  action:   done 2026-07-10: gradient_plot(df, colour_var, palette, ylab, caption) in setup serves all four gradient chunks (including usable-imd-by-age), with AGE_COLS / TREAT_COLS palette constants.
   notes:
 
 ## I. Fix `score_ci`'s hard-coded ×1000 scaling  ·  severity: STYLE
@@ -151,8 +151,8 @@ and `/1000` (lines ~766, ~956, ~1300). Add a `scale` argument. Also `wilson_lohi
 `add_score_ci()` wrapper.
 
 RESPONSE:
-  decision:
-  action:
+  decision: ACCEPT
+  action:   done 2026-07-10: score_ci gained a scale argument and now delegates to wilson_lohi (one copy of the Wilson math); add_score_ci() replaces every rowwise stanza; all /10 magic removed. The /1000 at the EB prior is a genuine unit conversion and stays.
   notes:
 
 ## J. Read `master_dataset_noaddr.csv` once  ·  severity: STYLE
@@ -161,8 +161,8 @@ The kit chunks read `master_dataset_noaddr.csv` 3–4× and re-define the
 and define the outcomes once.
 
 RESPONSE:
-  decision:
-  action:
+  decision: ACCEPT
+  action:   done 2026-07-10 (commit c4b20c6): master_dataset.csv (now the ECLIPS-PAP file) is read once in setup; kitc and the outcomes are defined once. The other inputs are also read once each.
   notes:
 
 ## K. Smaller cleanups  ·  severity: STYLE / NIT
@@ -176,6 +176,6 @@ RESPONSE:
   but worth a one-line note or confirming it's intended.
 
 RESPONSE (you can respond per-item in notes):
-  decision:
-  action:
+  decision: ACCEPT
+  action:   done 2026-07-10, all items: colors promoted to COL_BLUE / COL_ORANGE / COL_ORANGE2 constants; inner_join -> left_join at both sites; recode() replaced (case_match in age_grp_from_status, TREAT_LABELS lookups elsewhere); "datai" typo fixed; the two near-identical slide titles differentiated when the differences slide was rebuilt for both outcomes; the worry panel's omission is now stated in its caption (count computed from the data).
   notes:
