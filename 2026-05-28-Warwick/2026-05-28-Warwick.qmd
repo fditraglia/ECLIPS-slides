@@ -439,7 +439,7 @@ Merge LSOA-level demographics with Council Tax data (by LSOA)
 ```{r}
 #| label: lsoa-eligible-share-hist
 #| fig-width: 7
-#| fig-height: 3.5
+#| fig-height: 3.2
 lsoa_ref |>
   mutate(elig_rate = households_0_9 / total_households) |>
   ggplot(aes(elig_rate)) +
@@ -870,10 +870,9 @@ raw |>
 ### Identification: an experiment we ran by accident
 - *Across* LSOAs, letter counts were targeted (more where more young children) --- so we compare OAs only *within* LSOA $\times$ round, where the remaining variation is the lottery's (SD 2.2 pp in Round 1, 3.5 pp in Round 2)
 - Balance checks pass (census share of households with young children: $t = -0.17$)
-- Detectable (80% power): $\pm 7.4\%$ (started) / $\pm 10\%$ (usable) per +3.5 pp of saturation --- about one tenth of the old-house gap (old houses respond at $\approx 2\times$ the rate of others)
+- Detectable (80% power): $\pm 7.4\%$ (started) / $\pm 10\%$ (usable) per +3.5 pp of saturation --- one tenth of the old-house gap (old houses respond at $\approx 2\times$ the rate)
 
-\vspace{0.5em}
-\footnotesize Full design, balance tests, and power calculations: `saturation-spillover-design-note.md` (ECLIPS-PAP). Prespecified before estimation.
+\footnotesize Design, balance tests, and power calculations: `saturation-spillover-design-note.md` (ECLIPS-PAP); prespecified before estimation.
 
 ## No detectable spillover from neighbors' letters
 
@@ -1266,13 +1265,14 @@ ggplot(ret_dated, aes(received, colour = round_lab)) +
 
 \hfill\hyperlink{main-datasources}{\beamerreturnbutton{Back}}
 
+\footnotesize
 
 \vspace{-2em }
 ### Addresses Excluded: 5,521 total (categories overlap)
 - Unconventional households: 1,863 (hotels / student residences 936, vacant properties 931, with overlapping tags)
 - Missing LSOA: 524 (no valid UPRN $\Rightarrow$ no ONS lookup; includes 73 rows with no UPRN at all)
 - Missing postcode (after EPC fallback): 3,491
-- Known gap: the residence keyword list missed $\approx$ 87 mailed student addresses (Kirkstall Brewery, Lupton Flats); see `sampling-frame-codebook.md`
+- Known gap: $\approx$ 87 mailed student addresses missed by the keyword list (Kirkstall Brewery, Lupton Flats); see `sampling-frame-codebook.md`
 
 ### De-duplication
 - After exclusion, 18 UPRNs appear *exactly twice*  
@@ -1438,12 +1438,10 @@ Choose $(a, b)$ to maximise the marginal Beta-Binomial likelihood $\;\prod_\ell 
 
 ## Shrinkage of LSOA estimates, and the estimated rate distribution
 
-\vspace{-1em}
-
 ```{r}
 #| label: eb-shrinkage
 #| fig-width: 7.5
-#| fig-height: 4.3
+#| fig-height: 3.6
 #| out-width: 88%
 library(patchwork)
 xmax <- max(eb_lsoa$raw)
