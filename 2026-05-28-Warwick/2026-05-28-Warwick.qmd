@@ -719,6 +719,132 @@ bind_rows(
 
 
 
+## Survey drop-off: the consent page is the main exit
+
+```{r}
+#| label: dropoff-funnel
+#| fig-width: 8
+#| fig-height: 3.3
+# Item 6 (Ludovica's request). Classes come from the funnel flags (eligible,
+# valid_consent, gp_provided, Finished), which the pseudonymized files retain
+# for non-usable rows; the raw survey answers are blanked at pseudonymization.
+# "Stopped at the consent page": reported an eligible child but no valid
+# consent -- all such rows sit at Progress == 32, identifying that value as
+# the consent page. "No eligible child": finished (Progress 100) but
+# classified ineligible, i.e., screened out at the eligibility question.
+DROP_CLS <- c("Completed, usable", "Stopped at the consent page",
+              "Left in the first pages", "No eligible child (screened out)",
+              "Consented, no GP details")
+DROP_COLS <- c("Completed, usable" = COL_BLUE,
+               "Stopped at the consent page" = COL_ORANGE,
+               "Left in the first pages" = "grey55",
+               "No eligible child (screened out)" = "grey40",
+               "Consented, no GP details" = "grey70")
+dropoff <- raw |>
+  mutate(cls = case_when(
+    usable ~ "Completed, usable",
+    eligible & !valid_consent ~ "Stopped at the consent page",
+    eligible & valid_consent & !gp_provided ~ "Consented, no GP details",
+    !eligible & Finished ~ "No eligible child (screened out)",
+    TRUE ~ "Left in the first pages"),
+    cls = factor(cls, levels = DROP_CLS))
+
+dropoff |>
+  count(cls) |>
+  mutate(share = n / sum(n),
+         lab = paste0(n, "  (", sprintf("%.0f", 100 * share), "%)")) |>
+  ggplot(aes(x = n, y = fct_rev(cls), fill = cls)) +
+  geom_col(width = 0.7, show.legend = FALSE) +
+  geom_text(aes(label = lab), hjust = -0.08, size = 3.4) +
+  scale_fill_manual(values = DROP_COLS) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
+  labs(x = "Started responses (45-day window)", y = NULL,
+       caption = paste0("All ", nrow(dropoff), " started responses (45-day window); classes from the funnel flags, which are retained for non-usable rows.\n",
+                        "Of the 1,269 households reporting an eligible child, ",
+                        sum(dropoff$cls == "Stopped at the consent page"),
+                        " (29%) stopped exactly at the consent page, after the risk message.")) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
+## Survey drop-off: where leavers stop
+
+```{r}
+#| label: dropoff-pages
+#| fig-width: 8
+#| fig-height: 3.3
+# Progress-at-exit for everyone who started but did not end usable or
+# screened-out. Page identities are inferred from the funnel flags of those
+# who stop there: every consent-incomplete row sits at Progress 32 (the
+# consent page); GP-missing rows sit at 62/68; values below 32 precede the
+# eligibility question. The c/g/p page timers (one per treatment arm) show
+# whether a leaver submitted their arm's risk-message page.
+leavers <- dropoff |>
+  filter(!cls %in% c("Completed, usable", "No eligible child (screened out)")) |>
+  mutate(passed_msg = !is.na(coalesce(`c_timer_Page Submit`,
+                                      `g_timer_Page Submit`,
+                                      `p_timer_Page Submit`)))
+early_share <- leavers |>
+  filter(cls == "Left in the first pages") |>
+  summarise(m = mean(!passed_msg)) |>
+  pull(m)
+
+leavers |>
+  count(cls, Progress) |>
+  ggplot(aes(x = factor(Progress), y = n, fill = cls)) +
+  geom_col(width = 0.75) +
+  annotate("text", x = factor(32), y = 364, label = "consent page",
+           vjust = -0.6, size = 3.4, colour = "grey25") +
+  annotate("text", x = factor(62), y = 40, label = "GP details",
+           hjust = 0.2, vjust = -0.6, size = 3.4, colour = "grey25") +
+  scale_fill_manual(values = DROP_COLS, name = NULL) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(x = "Qualtrics Progress (%) when the session ended", y = "Responses",
+       caption = paste0("The ", nrow(leavers), " started responses that ended before completion (screened-out ineligibles excluded). ",
+                        "Page labels inferred from the funnel flags of those who stop there.\n",
+                        sprintf("%.0f", 100 * early_share),
+                        "% of the first-pages leavers never submitted their arm's risk-message page (its page timer is empty).")) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
+## Survey drop-off: when people start, relative to mailing
+
+```{r}
+#| label: dropoff-timing
+#| fig-width: 8
+#| fig-height: 3.3
+# Days from the round's mailing date to StartDate, by round and by whether
+# the response ended usable. Both rounds' responses cluster in the first two
+# weeks; the 45-day window is the outcome definition, not a binding deadline.
+timing <- raw |>
+  mutate(mail_date = if_else(round == 1, as.Date("2025-11-14"), as.Date("2026-01-22")),
+         days = as.numeric(as.Date(StartDate) - mail_date),
+         round_lab = paste("Round", round),
+         outcome = if_else(usable, "Usable", "Not usable"))
+med <- timing |> group_by(round_lab) |> summarise(m = median(days))
+
+ggplot(timing, aes(days, colour = round_lab, linetype = outcome)) +
+  stat_ecdf(linewidth = 0.7, pad = FALSE) +
+  scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE),
+                      name = NULL) +
+  scale_linetype_manual(values = c("Usable" = "solid", "Not usable" = "42"),
+                        name = NULL) +
+  scale_y_continuous(labels = scales::label_percent()) +
+  scale_x_continuous(breaks = seq(0, 45, 7), limits = c(0, 45)) +
+  labs(x = "Days from mailing to starting the survey",
+       y = "Share of responses started",
+       caption = paste0("All started responses, 45-day window. Median days to start: ",
+                        "Round 1 ", med$m[1], ", Round 2 ", med$m[2], ".")) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
 ## Intake Survey: Awareness of Lead
 
 \small Usable respondents ($N = `r nrow(surv)`$); counts shown on bars.
@@ -859,6 +985,138 @@ raw |>
                         ". Item non-response ('Rather not say' / blank) counts toward denominators, not numerators.")) +
   theme_minimal(base_size = 11) +
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
+```
+
+```{r}
+#| label: elig-share-prep
+#| include: false
+# Items 1 / 2 / 2b (Ludovica's requests). One row per LSOA (488): letters
+# mailed, started / usable / eligible-flagged responses (45-day window), the
+# census eligible share (households whose youngest child is 0-9, RM006), and
+# the IMD quintile. WLS with letters weights; robust (HC1) SEs for captions.
+lsoa_elig_tab <- addr |>
+  count(lsoa, name = "letters") |>
+  left_join(raw |> group_by(lsoa) |>
+              summarise(started = n(), usable = sum(usable),
+                        elig = sum(eligible), .groups = "drop"),
+            by = "lsoa") |>
+  mutate(across(c(started, usable, elig), \(x) replace_na(x, 0L))) |>
+  left_join(lsoa_ref |> transmute(lsoa = lsoa21cd,
+                                  share = households_0_9 / total_households),
+            by = "lsoa") |>
+  left_join(lsoa_imd, by = "lsoa") |>
+  mutate(q_lab = factor(gsub("\n", " ", as.character(bin_imd(imd_score))),
+                        levels = gsub("\n", " ", levels(bin_imd(imd_score)))),
+         rate = 1000 * usable / letters,
+         per_elig = 1000 * usable / (share * letters))
+
+m_share <- lm(rate ~ share, data = lsoa_elig_tab, weights = letters)
+se_share <- sqrt(sandwich::vcovHC(m_share, type = "HC1")[2, 2])
+m_pere <- lm(per_elig ~ share, data = lsoa_elig_tab,
+             weights = share * letters)
+se_pere <- sqrt(sandwich::vcovHC(m_pere, type = "HC1")[2, 2])
+```
+
+## Usable response rises only weakly with the LSOA's eligible share
+
+```{r}
+#| label: elig-share-scatter
+#| fig-width: 8
+#| fig-height: 3.5
+ggplot(lsoa_elig_tab, aes(share, rate)) +
+  geom_smooth(aes(weight = letters), method = "lm", formula = y ~ x,
+              colour = "grey30", linewidth = 0.7, fill = "grey80") +
+  geom_point(aes(size = letters, fill = q_lab), shape = 21,
+             colour = "grey35", stroke = 0.2, alpha = 0.85) +
+  scale_fill_brewer(palette = "YlOrBr", name = "IMD quintile") +
+  scale_size_area(max_size = 4, guide = "none") +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
+  coord_cartesian(ylim = c(0, 20)) +
+  labs(x = "Census share of households with a young child (LSOA)",
+       y = "Usable per 1,000 letters",
+       caption = sprintf(paste0("One dot per LSOA (488); dot area = letters mailed; %d dots above 20 per 1,000 are outside the plot area but in the fit.\n",
+                        "Line: WLS (letters weights); slope +%.1f usable per 1,000 letters per +10 pp of eligible share (robust SE %.1f).\n",
+                        "High-share LSOAs skew deprived (Q4-Q5), where response is lower --- the two gradients offset."),
+                        sum(lsoa_elig_tab$rate > 20),
+                        coef(m_share)[2] / 10, se_share / 10)) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
+## Response per (census-)eligible household falls as the eligible share rises
+
+```{r}
+#| label: per-elig-scatter
+#| fig-width: 8
+#| fig-height: 3.5
+# Item 2: same numerator, denominator = census share x letters, under the
+# stated assumption Pr(eligible | mailed, LSOA) = census share (the
+# back-of-envelope per-eligible estimand of phase1-analysis-plan.md Part 2).
+ggplot(lsoa_elig_tab, aes(share, per_elig)) +
+  geom_smooth(aes(weight = share * letters), method = "lm", formula = y ~ x,
+              colour = "grey30", linewidth = 0.7, fill = "grey80") +
+  geom_point(aes(size = share * letters, fill = q_lab), shape = 21,
+             colour = "grey35", stroke = 0.2, alpha = 0.85) +
+  scale_fill_brewer(palette = "YlOrBr", name = "IMD quintile") +
+  scale_size_area(max_size = 4, guide = "none") +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
+  coord_cartesian(ylim = c(0, 100)) +
+  labs(x = "Census share of households with a young child (LSOA)",
+       y = "Per 1,000 eligible mailings",
+       caption = sprintf(paste0("Denominator: census share x letters mailed; assumes Pr(eligible | mailed) equals the census share in each LSOA.\n",
+                        "Dot area = estimated eligible mailings; %d dots above 100 are outside the plot area but in the fit.\n",
+                        "Line: WLS (eligible-mailing weights); slope %.0f per 1,000 per +10 pp (robust SE %.0f).\n",
+                        "No adjustment for flagged non-household buildings (building-evidence.csv), which inflate a few LSOAs' letter counts."),
+                        sum(lsoa_elig_tab$per_elig > 100),
+                        coef(m_pere)[2] / 10, se_pere / 10)) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
+## Responders report an eligible child at $\approx$ 78% wherever they live
+
+```{r}
+#| label: elig-vs-census
+#| fig-width: 8
+#| fig-height: 3.5
+# Item 2b: the survey observes eligibility among responders; compare the share
+# of started responses reporting an eligible child with the census eligible
+# share, per LSOA. Faint dots: LSOAs with >= 1 started response. Blue points:
+# LSOAs grouped into deciles by census share (weighted by started responses),
+# with Wilson CIs. The comparison conditions on having responded --- eligible
+# households respond at higher rates, so the level is far above the census
+# share mechanically; the informative part is the (near-absent) gradient.
+l2b <- lsoa_elig_tab |> filter(started > 0)
+bins_2b <- l2b |>
+  arrange(share) |>
+  mutate(b = ntile(cumsum(started), 10)) |>
+  group_by(b) |>
+  summarise(share = weighted.mean(share, started),
+            elig = sum(elig), started = sum(started), .groups = "drop") |>
+  add_score_ci(elig, started, scale = 100)
+
+ggplot(bins_2b, aes(share, est)) +
+  geom_point(data = l2b, aes(share, 100 * elig / started, size = started),
+             colour = "grey75", alpha = 0.6, inherit.aes = FALSE) +
+  geom_hline(yintercept = 100 * sum(l2b$elig) / sum(l2b$started),
+             linetype = "dashed", colour = "grey55") +
+  geom_pointrange(aes(ymin = lo, ymax = hi), colour = COL_BLUE, size = 0.45) +
+  scale_size_area(max_size = 3.5, guide = "none") +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
+  scale_y_continuous(limits = c(0, 100)) +
+  labs(x = "Census share of households with a young child (LSOA)",
+       y = "% reporting an eligible child",
+       caption = paste0("Blue: LSOAs binned into deciles by census share (weighted by started responses), with 95% Wilson intervals;\n",
+                        "grey dots: individual LSOAs (area = started responses); dashed line: overall 78%.\n",
+                        "Conditions on having responded: eligible households respond at higher rates, so the level exceeds the census share\n",
+                        "by construction; the census share barely predicts responder eligibility.")) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
 ```
 
 # 3 - Kit Allocation and Exposure Survey
@@ -1491,6 +1749,38 @@ lsoa_map(eb_lsoa, "post", "Usable\nper 1,000")
 ```
 
 \small Posterior means --- *own scale (`r round(min(eb_lsoa$post))`--`r round(max(eb_lsoa$post))`) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
+
+## Response vs. eligible share, with empirical-Bayes rates
+
+```{r}
+#| label: elig-share-scatter-eb
+#| fig-width: 8
+#| fig-height: 3.5
+# Appendix companion to "Usable response rises only weakly with the LSOA's
+# eligible share": dots are the Beta-Binomial posterior means (the same
+# shrinkage as the LSOA maps) instead of raw rates, taming the small-LSOA
+# noise. The line is unchanged -- the WLS fit on the raw rates.
+eb_share <- eb_lsoa |>
+  left_join(lsoa_elig_tab |> select(lsoa, share, q_lab, letters), by = "lsoa")
+
+ggplot(eb_share, aes(share, post)) +
+  geom_smooth(data = lsoa_elig_tab, aes(share, rate, weight = letters),
+              method = "lm", formula = y ~ x,
+              colour = "grey30", linewidth = 0.7, fill = "grey80") +
+  geom_point(aes(size = letters, fill = q_lab), shape = 21,
+             colour = "grey35", stroke = 0.2, alpha = 0.85) +
+  scale_fill_brewer(palette = "YlOrBr", name = "IMD quintile") +
+  scale_size_area(max_size = 4, guide = "none") +
+  scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
+  labs(x = "Census share of households with a young child (LSOA)",
+       y = "Usable per 1,000 (EB posterior)",
+       caption = paste0("Dots: Beta-Binomial posterior means per LSOA (the shrinkage behind the appendix maps); dot area = letters mailed.\n",
+                        "Line: the same WLS fit as the main slide, computed from the raw rates with letters weights.")) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
 
 ## Clicking: deprivation gradient by housing age
 
