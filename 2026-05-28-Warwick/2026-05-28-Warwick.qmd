@@ -1159,59 +1159,80 @@ bind_rows(
 - Perhaps we could present some very preliminary results?-->
 
 
-## Timing of kit returns (Round 2) \hfill \small \alert{(Preliminary)}
+## Timing of kit returns \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-cdf
-#| fig-width: 7.5
+#| fig-width: 8
 #| fig-height: 3.4
-# Cumulative Round 2 kit returns as a share of Round 2's dispatched kits, by
-# lab receipt date, calendar time (date_posted is empty in the lab file, so
-# days-since-dispatch is not computable per kit). The curve levels off at the
-# return rate to date, so a visible plateau is the signal that returns have
-# dried up -- the input to the window-close decision (ANALYSIS-TODO item 10).
-# Round 2 only: all of its returns carry receipt dates, whereas 20 of Round
-# 1's 33 returns lack date_received, so a Round 1 curve would mostly show
-# missing dates, not timing (it is excluded; the caption reports its totals).
-# Earlier versions plotted the ECDF of dated returns (ends at 100% by
-# construction, hiding the level) and then both rounds together; reworked
-# 2026-07-11. Data flags recorded 2026-07-10, to raise with Andrea/Angela: 20
-# of the 154 returned kits lack date_received; 3 rows have date_sampled after
+# Cumulative kit returns as a share of each round's dispatched kits, by lab
+# receipt date, calendar time (date_posted is empty in the lab file, so
+# days-since-dispatch is not computable per kit). Each curve levels off at the
+# round's return rate to date -- the input to the window-close decision
+# (ANALYSIS-TODO item 10). One panel per round, because the rounds differ in
+# data quality, not just timing: Round 2's returns are fully dated, but 20 of
+# Round 1's 33 returns lack date_received, so its curve is a LOWER BOUND drawn
+# from 13 dated returns -- stated inside the panel, not just the caption, so
+# the omission Ludovica would otherwise have to infer is surfaced. Open
+# circles: total returned to date including undated returns. Earlier versions
+# plotted the ECDF of dated returns (ends at 100% by construction, hiding the
+# level), then Round 2 alone (hid Round 1's data problem); reworked
+# 2026-07-11. Data flags recorded 2026-07-10, raised with Andrea/Angela: 20 of
+# the 154 returned kits lack date_received; 3 rows have date_sampled after
 # date_received; one date_sampled reads 2026-09-03 (a future date).
-r1 <- kitc |> filter(round == 1)
-r2 <- kitc |> filter(round == 2)
-r2_dated <- r2 |>
+sent_by_round <- kitc |> count(round, name = "sent")
+ret_dated <- kitc |>
   filter(returned, !is.na(date_received)) |>
-  mutate(received = dmy(date_received))
-stopifnot(sum(r2$returned) == nrow(r2_dated))  # Round 2 fully dated
+  mutate(received = dmy(date_received),
+         round_lab = paste("Round", round))
 
-last_receipt <- max(r2_dated$received)
+last_receipt <- max(ret_dated$received)
 
-cum <- r2_dated |>
+cum <- ret_dated |>
   arrange(received) |>
-  mutate(share = row_number() / nrow(r2)) |>
-  bind_rows(tibble(received = last_receipt,
-                   share = nrow(r2_dated) / nrow(r2)))
+  group_by(round, round_lab) |>
+  mutate(share = row_number()) |>
+  ungroup() |>
+  left_join(sent_by_round, by = "round") |>
+  mutate(share = share / sent)
 
-ggplot(cum, aes(received, share)) +
-  geom_step(linewidth = 0.8, colour = COL_BLUE) +
+ends <- cum |>
+  group_by(round, round_lab) |>
+  slice_max(received, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  mutate(received = last_receipt)
+
+tot_marks <- kitc |>
+  group_by(round) |>
+  summarise(share = sum(returned) / n(), .groups = "drop") |>
+  mutate(round_lab = paste("Round", round), received = last_receipt)
+
+r1_note <- tibble(
+  round_lab = "Round 1",
+  received = min(cum$received), share = 0.31,
+  label = paste0("only ", sum(ret_dated$round == 1), " of ",
+                 sum(kitc$returned & kitc$round == 1),
+                 " returns have receipt dates:\ncurve = lower bound (dates being chased)"))
+
+ggplot(bind_rows(cum, ends), aes(received, share, colour = round_lab)) +
+  geom_step(linewidth = 0.8, show.legend = FALSE) +
+  geom_point(data = tot_marks, shape = 21, size = 2.6, stroke = 0.9,
+             fill = "white", show.legend = FALSE) +
+  geom_text(data = r1_note, aes(label = label), hjust = 0, vjust = 1,
+            size = 2.9, colour = "grey25", lineheight = 1.1) +
   geom_vline(xintercept = last_receipt, linetype = "dashed", colour = "grey55") +
-  annotate("text", x = last_receipt, y = 0.05,
-           label = paste0("last receipt: ", format(last_receipt, "%d %b %Y"), " "),
-           hjust = 1, size = 3.2, colour = "grey30") +
+  facet_wrap(~ round_lab) +
   scale_y_continuous(labels = scales::label_percent(),
-                     limits = c(0, 0.35)) +
-  scale_x_date(date_breaks = "2 weeks", date_labels = "%d %b",
-               expand = expansion(mult = c(0.02, 0.08))) +
-  labs(x = NULL,
-       y = "Share of Round 2 kits returned",
-       caption = paste0("All ", nrow(r2_dated), " Round 2 returns carry a lab receipt date; share of the ",
-                        nrow(r2), " Round 2 kits dispatched.\n",
-                        "Round 1 is not shown: ",
-                        sum(r1$returned) - sum(r1$returned & !is.na(r1$date_received)),
-                        " of its ", sum(r1$returned), " returns (of ", nrow(r1),
-                        " kits) lack a receipt date, so its timing cannot be drawn.\n",
-                        "Blood-results data through the 2026-06-22 lab export; later receipts, if any, are not yet in the data.")) +
+                     limits = c(0, 0.37)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y",
+               expand = expansion(mult = c(0.02, 0.06))) +
+  scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE)) +
+  labs(x = NULL, y = "Share of round's kits returned",
+       caption = paste0("Curves: returns with a lab receipt date, as a share of kits dispatched (Round 1: ",
+                        sent_by_round$sent[1], ", Round 2: ", sent_by_round$sent[2],
+                        "). Open circles: total returned to date, including undated returns.\n",
+                        "Dashed line: last dated receipt, ", format(last_receipt, "%d %b %Y"),
+                        ". Blood-results data through the 2026-06-22 lab export; later receipts, if any, are not yet in the data.")) +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank(),
         plot.caption = element_text(size = 8, colour = "grey40"))
