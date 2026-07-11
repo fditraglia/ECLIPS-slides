@@ -1023,7 +1023,7 @@ se_pere <- sqrt(sandwich::vcovHC(m_pere, type = "HC1")[2, 2])
 \small
 
 ### What the next four slides show
-- We mailed where the census says young children live, but responses barely followed: 3$\times$ the eligible share brings $\approx$ 20% more responses per letter, not 200%
+- We mailed where the census says young children live, but responses barely followed: an LSOA with 3$\times$ the eligible share returns about 1.2$\times$ the responses per letter, where proportionality says 3$\times$
 - It is not a map problem: a current ONS map of the exact eligible birth cohort predicts response identically to the 2021 census share
 - It is a deprivation problem: eligible families cluster in deprived areas, and deprived areas do not respond. Where deprivation is low, response tracks eligibility roughly one-for-one; in the most deprived fifth of Leeds it does not track it at all
 - And it is eligible families *not responding*, not letters missing them: 92% of those who answer the survey's first question report an eligible child, everywhere in Leeds
