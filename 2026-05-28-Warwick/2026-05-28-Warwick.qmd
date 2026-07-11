@@ -1177,9 +1177,10 @@ bind_rows(
 # circles: total returned to date including undated returns. Earlier versions
 # plotted the ECDF of dated returns (ends at 100% by construction, hiding the
 # level), then Round 2 alone (hid Round 1's data problem); reworked
-# 2026-07-11. Data flags recorded 2026-07-10, raised with Andrea/Angela: 20 of
-# the 154 returned kits lack date_received; 3 rows have date_sampled after
-# date_received; one date_sampled reads 2026-09-03 (a future date).
+# 2026-07-11. Data flags raised with Andrea in #general 2026-07-10 (ts
+# 1783723563.956829; no reply as of 2026-07-11): 20 of the 154 returned kits
+# lack date_received; 3 rows have date_sampled after date_received; one
+# date_sampled reads 2026-09-03 (a future date).
 sent_by_round <- kitc |> count(round, name = "sent")
 ret_dated <- kitc |>
   filter(returned, !is.na(date_received)) |>
@@ -1212,7 +1213,7 @@ r1_note <- tibble(
   received = min(cum$received), share = 0.31,
   label = paste0("only ", sum(ret_dated$round == 1), " of ",
                  sum(kitc$returned & kitc$round == 1),
-                 " returns have receipt dates:\ncurve = lower bound (dates being chased)"))
+                 " returns have receipt dates:\ncurve = lower bound (missing dates flagged\nwith Warwick 2026-07-10, no reply yet)"))
 
 ggplot(bind_rows(cum, ends), aes(received, share, colour = round_lab)) +
   geom_step(linewidth = 0.8, show.legend = FALSE) +
