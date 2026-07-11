@@ -1504,139 +1504,22 @@ imd_cells |>
                 caption = paste0("Old houses only; ", ci_caption))
 ```
 
-## Spillovers: did letters work better where neighbors also got one?
+## Spillovers from local letter density: checked; the data cannot answer it
 
 \hypertarget{appx-spillover}{}
 
-### The question
-- A letter could work partly *through neighbors*: people talk, compare letters, remind each other
-- If so, the same letter should produce more responses where many nearby households were also mailed than where few were
+\small
 
-### What is observable
-- Only mailed households can respond: each response comes through the letter's own survey link
-- So the question we can ask is: does a *mailed* household's response depend on how many of its neighbors were also mailed?
-- Spillovers onto households *without* a letter are invisible by construction --- no link, so no way to appear in the data
+### The idea
+- Within an LSOA, *which* addresses got letters was a lottery, so nearby Output Areas got different shares by chance; if neighbors talk, more-saturated OAs should respond at a higher rate per letter
 
-### The obstacle
-- We *chose* where letters went (more letters where more young children live), so comparing high-letter areas to low-letter areas would mix our own targeting with any true spillover
+### Why the data cannot answer it
+- OAs are census units of $\approx$ 94--211 addresses, so the chance variation is tiny: SD 3.5 pp of saturation, $\approx$ 5 letters among 150 addresses
+- Detectable slope (80% power): 2--3% relative change in response per +1 pp of neighbors mailed --- linearly, mailing all vs. none would have to *at least triple* response
+- A large-but-plausible spillover (full saturation raising response 25%) is $\approx 10\times$ too small to detect
 
-## Spillovers: an experiment we ran by accident
+### The result (all specifications prespecified)
+- Null: started $-1.0\%$ [$-5.7$, $+3.7$], usable $-1.1\%$ [$-7.7$, $+5.6$] per +3.5 pp (one SD)
+- Reading: no steep hyper-local dose-response; uninformative about gentle slopes
 
-```{r}
-#| label: spill-prep
-#| include: false
-# OA-level letter saturation by round, from the committed frame and letters
-# files. Example LSOA for display: among Round 2 LSOAs with exactly five
-# mailed OAs, the one whose within-LSOA SD of OA shares is closest to the
-# overall within-LSOA SD -- i.e., as typical as possible.
-frame_oa <- read_csv("~/ECLIPS-PAP/data/processed/sampling-frame.csv",
-                     show_col_types = FALSE) |>
-  count(oa, lsoa, name = "N_o")
-
-oa_round <- addr |>
-  mutate(round = if_else(tranche == 1, 1L, 2L)) |>
-  count(oa, round, name = "letters") |>
-  left_join(frame_oa, by = "oa") |>
-  mutate(share = letters / N_o) |>
-  group_by(lsoa, round) |>
-  mutate(z = share - weighted.mean(share, letters)) |>
-  ungroup()
-
-sig <- oa_round |>
-  group_by(round) |>
-  summarise(sd = sqrt(weighted.mean(z^2, letters)), .groups = "drop")
-sig1_pp <- sprintf("%.1f", 100 * sig$sd[1])
-sig2_pp <- sprintf("%.1f", 100 * sig$sd[2])
-
-ex_lsoa <- oa_round |>
-  filter(round == 2) |>
-  group_by(lsoa) |>
-  filter(n() == 5) |>
-  summarise(sd_l = sqrt(weighted.mean(z^2, letters)), .groups = "drop") |>
-  slice_min(abs(sd_l - sig$sd[2]), n = 1, with_ties = FALSE) |>
-  pull(lsoa)
-
-ex_rows <- oa_round |> filter(round == 2, lsoa == ex_lsoa)
-ex_tab <- ex_rows |>
-  arrange(desc(share)) |>
-  transmute(OA = paste("OA", row_number()),
-            Addresses = N_o, Letters = letters,
-            `Share mailed` = sprintf("%.0f%%", 100 * share))
-ex_rate_pct <- sprintf("%.0f", 100 * sum(ex_rows$letters) / sum(ex_rows$N_o))
-```
-
-### The lottery inside each LSOA
-- Targeting fixed only *how many* letters each LSOA got; *which* of its addresses got them was simple random sampling (fixed seed, Script 02)
-- An LSOA ($\approx 750$ addresses) contains about five Output Areas ($\approx 150$ addresses each); chance alone dealt some OAs a larger share than others
-
-### A typical LSOA in Round 2 (`r ex_lsoa`)
-
-```{r}
-#| label: spill-example
-#| results: asis
-knitr::kable(ex_tab, format = "latex", booktabs = TRUE,
-             align = "lrrr", linesep = "")
-```
-
-- The LSOA-level rate (`r ex_rate_pct`% of its addresses) was our choice; how the letters fell across its five OAs was not --- that is the shuffle of the deck
-
-## Spillovers: how much chance variation, and is the lottery fair?
-
-### How much chance variation?
-- Across all OAs, the within-LSOA spread (SD) of the share mailed is `r sig1_pp` pp in Round 1 and `r sig2_pp` pp in Round 2
-- That is the size the sampling design itself implies: re-simulating the whole draw 400 times reproduces the same SD
-- So a "+1 SD more saturated" OA in Round 2 had about 3.5 pp more of its addresses mailed than its LSOA's average
-
-### Is the lottery fair? (balance)
-- OAs dealt a larger share look no different on what we can measure: census share of households with young children ($t = -0.17$), old-house share, address-frame coverage
-- The one statistic that looks off (OA size) is a mechanical artifact of the letter weighting: re-running the lottery on paper produces it too, and OA size is a control in the regression anyway
-
-## Spillovers: estimation and power
-
-### The regression (one observation per OA $\times$ round)
-$$\text{response rate}_{or} \;=\; \alpha_{\ell(o),\,r} \;+\; \beta \cdot \text{share mailed}_{or} \;+\; \mathbf{x}_o'\gamma \;+\; \varepsilon_{or}$$
-
-- Response rate = responses per letter mailed in OA $o$, round $r$; weights = letters mailed; SEs clustered by LSOA; $\mathbf{x}_o$ = OA size and old-house share
-- $\alpha_{\ell(o),\,r}$: LSOA $\times$ round fixed effects --- an OA is compared only with the other OAs of its own LSOA, in the same round, so our targeting drops out entirely
-- Exposure is round-specific: Round 1 responses were all in before any Round 2 letter existed
-
-### What the design can detect (80% power, 5% two-sided)
-- A spillover of $\pm 7.4\%$ (started) / $\pm 10\%$ (usable) of the response rate per +3.5 pp of neighbor saturation (one SD) --- one tenth of the old-house gap (old houses respond at $\approx 2\times$ the rate)
-
-\footnotesize Full design, prespecified choices, balance tests, and power: `saturation-spillover-design-note.md` (ECLIPS-PAP repo); estimation: Script 28, results in `spillover-estimates.csv`.
-
-## No detectable spillover from neighbors' letters
-
-```{r}
-#| label: spillover-forest
-#| fig-width: 8
-#| fig-height: 3.6
-# Prespecified spillover estimates (ECLIPS-PAP Script 28): % change in response
-# rate per +3.5 pp of OA letter saturation (one within-LSOA SD, Round 2), with
-# 95% CIs -- clustered by LSOA (LPM rows), model-based (logit rows).
-spill_specs <- c(primary                = "Primary: LPM, mailed exposure",
-                 cumulative_exposure_r2 = "Cumulative exposure (Round 2)",
-                 delivered_denominator  = "Returned letters out of denominator",
-                 quasibinomial          = "Quasi-binomial GLM",
-                 conditional_logit      = "Conditional logit")
-
-read_csv("~/ECLIPS-PAP/data/processed/spillover-estimates.csv",
-         show_col_types = FALSE) |>
-  mutate(spec = factor(spill_specs[spec], levels = rev(unname(spill_specs))),
-         outcome = factor(if_else(outcome == "started",
-                                  "Started (clicked)", "Usable response"),
-                          levels = c("Started (clicked)", "Usable response"))) |>
-  ggplot(aes(x = rel_est, y = spec)) +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
-  geom_errorbarh(aes(xmin = rel_lo, xmax = rel_hi), height = 0.15,
-                 linewidth = 0.8, colour = COL_BLUE) +
-  geom_point(size = 3, colour = COL_BLUE) +
-  facet_wrap(~ outcome) +
-  labs(x = "% change in response rate per +3.5 pp of OA letter saturation",
-       y = NULL,
-       caption = paste0("95% CIs: clustered by LSOA (top three rows), model-based (bottom two). ",
-                        "All specifications prespecified in the design note.")) +
-  theme_minimal(base_size = 13) +
-  theme(panel.grid.major.y = element_blank(),
-        plot.caption = element_text(size = 9, colour = "grey40"))
-```
+\footnotesize Full record: `saturation-spillover-design-note.md`, Script 28, `spillover-estimates.csv` (ECLIPS-PAP).
