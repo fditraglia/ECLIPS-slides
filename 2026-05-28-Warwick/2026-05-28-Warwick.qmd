@@ -861,55 +861,6 @@ raw |>
   theme(plot.caption = element_text(size = 9, colour = "grey40"))
 ```
 
-## Spillovers: does it matter if your neighbors also got a letter?
-
-### The idea
-- Within an LSOA, *which* addresses got a letter was decided by lottery, so some Output Areas ($\approx 150$ addresses) got a larger share of letters than nearby ones purely by chance
-- If neighbors talk to each other, letters should work better where more neighbors also got one
-
-### Identification: an experiment we ran by accident
-- *Across* LSOAs, letter counts were targeted (more where more young children) --- so we compare OAs only *within* LSOA $\times$ round, where the remaining variation is the lottery's (SD 2.2 pp in Round 1, 3.5 pp in Round 2)
-- Balance checks pass (census share of households with young children: $t = -0.17$)
-- Detectable (80% power): $\pm 7.4\%$ (started) / $\pm 10\%$ (usable) per +3.5 pp of saturation --- one tenth of the old-house gap (old houses respond at $\approx 2\times$ the rate)
-
-\footnotesize Design, balance tests, and power calculations: `saturation-spillover-design-note.md` (ECLIPS-PAP); prespecified before estimation.
-
-## No detectable spillover from neighbors' letters
-
-```{r}
-#| label: spillover-forest
-#| fig-width: 8
-#| fig-height: 3.6
-# Prespecified spillover estimates (ECLIPS-PAP Script 28): % change in response
-# rate per +3.5 pp of OA letter saturation (one within-LSOA SD, Round 2), with
-# 95% CIs -- clustered by LSOA (LPM rows), model-based (logit rows).
-spill_specs <- c(primary                = "Primary: LPM, mailed exposure",
-                 cumulative_exposure_r2 = "Cumulative exposure (Round 2)",
-                 delivered_denominator  = "Returned letters out of denominator",
-                 quasibinomial          = "Quasi-binomial GLM",
-                 conditional_logit      = "Conditional logit")
-
-read_csv("~/ECLIPS-PAP/data/processed/spillover-estimates.csv",
-         show_col_types = FALSE) |>
-  mutate(spec = factor(spill_specs[spec], levels = rev(unname(spill_specs))),
-         outcome = factor(if_else(outcome == "started",
-                                  "Started (clicked)", "Usable response"),
-                          levels = c("Started (clicked)", "Usable response"))) |>
-  ggplot(aes(x = rel_est, y = spec)) +
-  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
-  geom_errorbarh(aes(xmin = rel_lo, xmax = rel_hi), height = 0.15,
-                 linewidth = 0.8, colour = COL_BLUE) +
-  geom_point(size = 3, colour = COL_BLUE) +
-  facet_wrap(~ outcome) +
-  labs(x = "% change in response rate per +3.5 pp of OA letter saturation",
-       y = NULL,
-       caption = paste0("95% CIs: clustered by LSOA (top three rows), model-based (bottom two). ",
-                        "All specifications prespecified in the design note.")) +
-  theme_minimal(base_size = 13) +
-  theme(panel.grid.major.y = element_blank(),
-        plot.caption = element_text(size = 9, colour = "grey40"))
-```
-
 # 3 - Kit Allocation and Exposure Survey
 
 ## Kit Allocation
@@ -1214,12 +1165,23 @@ bind_rows(
 #| label: kit-return-cdf
 #| fig-width: 7.5
 #| fig-height: 3.4
-# Cumulative lab receipts of returned blood-spot cards, by round, calendar
-# time (date_posted is empty in the lab file, so days-since-dispatch is not
-# computable per kit). Input to the window-close decision (ANALYSIS-TODO item
-# 10). Data flags recorded 2026-07-10, to raise with Andrea/Angela: 20 of the
-# 154 returned kits lack date_received; 3 rows have date_sampled after
-# date_received; one date_sampled reads 2026-09-03 (a future date).
+# Cumulative kit returns as a share of the round's DISPATCHED kits, by lab
+# receipt date, calendar time (date_posted is empty in the lab file, so
+# days-since-dispatch is not computable per kit). Each curve levels off at the
+# round's return rate to date, so a visible plateau is the signal that returns
+# have dried up -- the input to the window-close decision (ANALYSIS-TODO item
+# 10). An earlier version plotted the ECDF of dated returns, which ends at
+# 100% by construction and hides the level; renormalized 2026-07-11. Undated
+# returns cannot be placed in time and are excluded from the curves; the
+# caption reports totals including them. Data flags recorded 2026-07-10, to
+# raise with Andrea/Angela: 20 of the 154 returned kits lack date_received;
+# 3 rows have date_sampled after date_received; one date_sampled reads
+# 2026-09-03 (a future date).
+sent_by_round <- kitc |> count(round, name = "sent")
+tot_by_round  <- kitc |>
+  group_by(round) |>
+  summarise(ret_all = sum(returned), sent = n(), .groups = "drop")
+
 ret_dated <- kitc |>
   filter(returned, !is.na(date_received)) |>
   mutate(received = dmy(date_received),
@@ -1227,23 +1189,48 @@ ret_dated <- kitc |>
 
 last_receipt <- max(ret_dated$received)
 
-ggplot(ret_dated, aes(received, colour = round_lab)) +
-  stat_ecdf(linewidth = 0.8, pad = FALSE) +
+cum <- ret_dated |>
+  arrange(received) |>
+  group_by(round, round_lab) |>
+  mutate(share = row_number()) |>
+  ungroup() |>
+  left_join(sent_by_round, by = "round") |>
+  mutate(share = share / sent)
+
+# extend each curve flat to the last receipt date so the plateau is visible
+ends <- cum |>
+  group_by(round, round_lab) |>
+  slice_max(received, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  mutate(received = last_receipt)
+
+# open circles: total returned to date per round, INCLUDING undated returns
+tot_marks <- tot_by_round |>
+  mutate(round_lab = paste("Round", round),
+         received = last_receipt, share = ret_all / sent)
+n_undated <- sum(kitc$returned) - nrow(ret_dated)
+
+ggplot(bind_rows(cum, ends), aes(received, share, colour = round_lab)) +
+  geom_step(linewidth = 0.8) +
+  geom_point(data = tot_marks, shape = 21, size = 2.6, stroke = 0.9,
+             fill = "white") +
   geom_vline(xintercept = last_receipt, linetype = "dashed", colour = "grey55") +
-  annotate("text", x = last_receipt, y = 0.15,
-           label = paste(" last receipt:", format(last_receipt, "%d %b %Y")),
-           hjust = 0, size = 3.2, colour = "grey30") +
-  scale_y_continuous(labels = scales::label_percent()) +
+  annotate("text", x = last_receipt, y = 0.05,
+           label = paste0("last receipt: ", format(last_receipt, "%d %b %Y"), " "),
+           hjust = 1, size = 3.2, colour = "grey30") +
+  scale_y_continuous(labels = scales::label_percent(),
+                     limits = c(0, 0.4)) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y",
                expand = expansion(mult = c(0.02, 0.18))) +
   scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE)) +
-  labs(x = NULL, y = "Share of dated returns received", colour = NULL,
-       caption = paste0("Blood-results data through the 2026-06-22 lab export ",
-                        "(the master dataset's current blood input); later receipts, if any, are not yet in the data. ",
-                        nrow(ret_dated), " of the ", sum(kitc$returned),
-                        " returned kits carry a lab receipt date; the ",
-                        sum(kitc$returned) - nrow(ret_dated),
-                        " undated ones are not shown.")) +
+  labs(x = NULL, y = "Share of round's kits returned", colour = NULL,
+       caption = paste0("Curves: the ", nrow(ret_dated), " returns with a lab receipt date, as a share of kits dispatched ",
+                        "(Round 1: ", tot_by_round$sent[1], ", Round 2: ", tot_by_round$sent[2], ").\n",
+                        "Open circles: total returned to date, including the ", n_undated,
+                        " returns without a receipt date (Round 1: ",
+                        sum(kitc$returned & kitc$round == 1) - sum(ret_dated$round == 1), ", Round 2: ",
+                        sum(kitc$returned & kitc$round == 2) - sum(ret_dated$round == 2), ").\n",
+                        "Blood-results data through the 2026-06-22 lab export; later receipts, if any, are not yet in the data.")) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom",
         panel.grid.minor = element_blank(),
@@ -1535,4 +1522,141 @@ imd_cells |>
                             levels = unname(TREAT_LABELS))) |>
   gradient_plot("treatment", TREAT_COLS, "Clicks per 1,000",
                 caption = paste0("Old houses only; ", ci_caption))
+```
+
+## Spillovers: did letters work better where neighbors also got one?
+
+\hypertarget{appx-spillover}{}
+
+### The question
+- A letter could work partly *through neighbors*: people talk, compare letters, remind each other
+- If so, the same letter should produce more responses where many nearby households were also mailed than where few were
+
+### What is observable
+- Only mailed households can respond: each response comes through the letter's own survey link
+- So the question we can ask is: does a *mailed* household's response depend on how many of its neighbors were also mailed?
+- Spillovers onto households *without* a letter are invisible by construction --- no link, so no way to appear in the data
+
+### The obstacle
+- We *chose* where letters went (more letters where more young children live), so comparing high-letter areas to low-letter areas would mix our own targeting with any true spillover
+
+## Spillovers: an experiment we ran by accident
+
+```{r}
+#| label: spill-prep
+#| include: false
+# OA-level letter saturation by round, from the committed frame and letters
+# files. Example LSOA for display: among Round 2 LSOAs with exactly five
+# mailed OAs, the one whose within-LSOA SD of OA shares is closest to the
+# overall within-LSOA SD -- i.e., as typical as possible.
+frame_oa <- read_csv("~/ECLIPS-PAP/data/processed/sampling-frame.csv",
+                     show_col_types = FALSE) |>
+  count(oa, lsoa, name = "N_o")
+
+oa_round <- addr |>
+  mutate(round = if_else(tranche == 1, 1L, 2L)) |>
+  count(oa, round, name = "letters") |>
+  left_join(frame_oa, by = "oa") |>
+  mutate(share = letters / N_o) |>
+  group_by(lsoa, round) |>
+  mutate(z = share - weighted.mean(share, letters)) |>
+  ungroup()
+
+sig <- oa_round |>
+  group_by(round) |>
+  summarise(sd = sqrt(weighted.mean(z^2, letters)), .groups = "drop")
+sig1_pp <- sprintf("%.1f", 100 * sig$sd[1])
+sig2_pp <- sprintf("%.1f", 100 * sig$sd[2])
+
+ex_lsoa <- oa_round |>
+  filter(round == 2) |>
+  group_by(lsoa) |>
+  filter(n() == 5) |>
+  summarise(sd_l = sqrt(weighted.mean(z^2, letters)), .groups = "drop") |>
+  slice_min(abs(sd_l - sig$sd[2]), n = 1, with_ties = FALSE) |>
+  pull(lsoa)
+
+ex_rows <- oa_round |> filter(round == 2, lsoa == ex_lsoa)
+ex_tab <- ex_rows |>
+  arrange(desc(share)) |>
+  transmute(OA = paste("OA", row_number()),
+            Addresses = N_o, Letters = letters,
+            `Share mailed` = sprintf("%.0f%%", 100 * share))
+ex_rate_pct <- sprintf("%.0f", 100 * sum(ex_rows$letters) / sum(ex_rows$N_o))
+```
+
+### The lottery inside each LSOA
+- Targeting fixed only *how many* letters each LSOA got; *which* of its addresses got them was simple random sampling (fixed seed, Script 02)
+- An LSOA ($\approx 750$ addresses) contains about five Output Areas ($\approx 150$ addresses each); chance alone dealt some OAs a larger share than others
+
+### A typical LSOA in Round 2 (`r ex_lsoa`)
+
+```{r}
+#| label: spill-example
+#| results: asis
+knitr::kable(ex_tab, format = "latex", booktabs = TRUE,
+             align = "lrrr", linesep = "")
+```
+
+- The LSOA-level rate (`r ex_rate_pct`% of its addresses) was our choice; how the letters fell across its five OAs was not --- that is the shuffle of the deck
+
+## Spillovers: how much chance variation, and is the lottery fair?
+
+### How much chance variation?
+- Across all OAs, the within-LSOA spread (SD) of the share mailed is `r sig1_pp` pp in Round 1 and `r sig2_pp` pp in Round 2
+- That is the size the sampling design itself implies: re-simulating the whole draw 400 times reproduces the same SD
+- So a "+1 SD more saturated" OA in Round 2 had about 3.5 pp more of its addresses mailed than its LSOA's average
+
+### Is the lottery fair? (balance)
+- OAs dealt a larger share look no different on what we can measure: census share of households with young children ($t = -0.17$), old-house share, address-frame coverage
+- The one statistic that looks off (OA size) is a mechanical artifact of the letter weighting: re-running the lottery on paper produces it too, and OA size is a control in the regression anyway
+
+## Spillovers: estimation and power
+
+### The regression (one observation per OA $\times$ round)
+$$\text{response rate}_{or} \;=\; \alpha_{\ell(o),\,r} \;+\; \beta \cdot \text{share mailed}_{or} \;+\; \mathbf{x}_o'\gamma \;+\; \varepsilon_{or}$$
+
+- Response rate = responses per letter mailed in OA $o$, round $r$; weights = letters mailed; SEs clustered by LSOA; $\mathbf{x}_o$ = OA size and old-house share
+- $\alpha_{\ell(o),\,r}$: LSOA $\times$ round fixed effects --- an OA is compared only with the other OAs of its own LSOA, in the same round, so our targeting drops out entirely
+- Exposure is round-specific: Round 1 responses were all in before any Round 2 letter existed
+
+### What the design can detect (80% power, 5% two-sided)
+- A spillover of $\pm 7.4\%$ (started) / $\pm 10\%$ (usable) of the response rate per +3.5 pp of neighbor saturation (one SD) --- one tenth of the old-house gap (old houses respond at $\approx 2\times$ the rate)
+
+\footnotesize Full design, prespecified choices, balance tests, and power: `saturation-spillover-design-note.md` (ECLIPS-PAP repo); estimation: Script 28, results in `spillover-estimates.csv`.
+
+## No detectable spillover from neighbors' letters
+
+```{r}
+#| label: spillover-forest
+#| fig-width: 8
+#| fig-height: 3.6
+# Prespecified spillover estimates (ECLIPS-PAP Script 28): % change in response
+# rate per +3.5 pp of OA letter saturation (one within-LSOA SD, Round 2), with
+# 95% CIs -- clustered by LSOA (LPM rows), model-based (logit rows).
+spill_specs <- c(primary                = "Primary: LPM, mailed exposure",
+                 cumulative_exposure_r2 = "Cumulative exposure (Round 2)",
+                 delivered_denominator  = "Returned letters out of denominator",
+                 quasibinomial          = "Quasi-binomial GLM",
+                 conditional_logit      = "Conditional logit")
+
+read_csv("~/ECLIPS-PAP/data/processed/spillover-estimates.csv",
+         show_col_types = FALSE) |>
+  mutate(spec = factor(spill_specs[spec], levels = rev(unname(spill_specs))),
+         outcome = factor(if_else(outcome == "started",
+                                  "Started (clicked)", "Usable response"),
+                          levels = c("Started (clicked)", "Usable response"))) |>
+  ggplot(aes(x = rel_est, y = spec)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
+  geom_errorbarh(aes(xmin = rel_lo, xmax = rel_hi), height = 0.15,
+                 linewidth = 0.8, colour = COL_BLUE) +
+  geom_point(size = 3, colour = COL_BLUE) +
+  facet_wrap(~ outcome) +
+  labs(x = "% change in response rate per +3.5 pp of OA letter saturation",
+       y = NULL,
+       caption = paste0("95% CIs: clustered by LSOA (top three rows), model-based (bottom two). ",
+                        "All specifications prespecified in the design note.")) +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.major.y = element_blank(),
+        plot.caption = element_text(size = 9, colour = "grey40"))
 ```
