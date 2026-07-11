@@ -1159,81 +1159,61 @@ bind_rows(
 - Perhaps we could present some very preliminary results?-->
 
 
-## Timing of kit returns \hfill \small \alert{(Preliminary)}
+## Timing of kit returns (Round 2) \hfill \small \alert{(Preliminary)}
 
 ```{r}
 #| label: kit-return-cdf
 #| fig-width: 7.5
 #| fig-height: 3.4
-# Cumulative kit returns as a share of the round's DISPATCHED kits, by lab
-# receipt date, calendar time (date_posted is empty in the lab file, so
-# days-since-dispatch is not computable per kit). Each curve levels off at the
-# round's return rate to date, so a visible plateau is the signal that returns
-# have dried up -- the input to the window-close decision (ANALYSIS-TODO item
-# 10). An earlier version plotted the ECDF of dated returns, which ends at
-# 100% by construction and hides the level; renormalized 2026-07-11. Undated
-# returns cannot be placed in time and are excluded from the curves; the
-# caption reports totals including them. Data flags recorded 2026-07-10, to
-# raise with Andrea/Angela: 20 of the 154 returned kits lack date_received;
-# 3 rows have date_sampled after date_received; one date_sampled reads
-# 2026-09-03 (a future date).
-sent_by_round <- kitc |> count(round, name = "sent")
-tot_by_round  <- kitc |>
-  group_by(round) |>
-  summarise(ret_all = sum(returned), sent = n(), .groups = "drop")
-
-ret_dated <- kitc |>
+# Cumulative Round 2 kit returns as a share of Round 2's dispatched kits, by
+# lab receipt date, calendar time (date_posted is empty in the lab file, so
+# days-since-dispatch is not computable per kit). The curve levels off at the
+# return rate to date, so a visible plateau is the signal that returns have
+# dried up -- the input to the window-close decision (ANALYSIS-TODO item 10).
+# Round 2 only: all of its returns carry receipt dates, whereas 20 of Round
+# 1's 33 returns lack date_received, so a Round 1 curve would mostly show
+# missing dates, not timing (it is excluded; the caption reports its totals).
+# Earlier versions plotted the ECDF of dated returns (ends at 100% by
+# construction, hiding the level) and then both rounds together; reworked
+# 2026-07-11. Data flags recorded 2026-07-10, to raise with Andrea/Angela: 20
+# of the 154 returned kits lack date_received; 3 rows have date_sampled after
+# date_received; one date_sampled reads 2026-09-03 (a future date).
+r1 <- kitc |> filter(round == 1)
+r2 <- kitc |> filter(round == 2)
+r2_dated <- r2 |>
   filter(returned, !is.na(date_received)) |>
-  mutate(received = dmy(date_received),
-         round_lab = paste("Round", round))
+  mutate(received = dmy(date_received))
+stopifnot(sum(r2$returned) == nrow(r2_dated))  # Round 2 fully dated
 
-last_receipt <- max(ret_dated$received)
+last_receipt <- max(r2_dated$received)
 
-cum <- ret_dated |>
+cum <- r2_dated |>
   arrange(received) |>
-  group_by(round, round_lab) |>
-  mutate(share = row_number()) |>
-  ungroup() |>
-  left_join(sent_by_round, by = "round") |>
-  mutate(share = share / sent)
+  mutate(share = row_number() / nrow(r2)) |>
+  bind_rows(tibble(received = last_receipt,
+                   share = nrow(r2_dated) / nrow(r2)))
 
-# extend each curve flat to the last receipt date so the plateau is visible
-ends <- cum |>
-  group_by(round, round_lab) |>
-  slice_max(received, n = 1, with_ties = FALSE) |>
-  ungroup() |>
-  mutate(received = last_receipt)
-
-# open circles: total returned to date per round, INCLUDING undated returns
-tot_marks <- tot_by_round |>
-  mutate(round_lab = paste("Round", round),
-         received = last_receipt, share = ret_all / sent)
-n_undated <- sum(kitc$returned) - nrow(ret_dated)
-
-ggplot(bind_rows(cum, ends), aes(received, share, colour = round_lab)) +
-  geom_step(linewidth = 0.8) +
-  geom_point(data = tot_marks, shape = 21, size = 2.6, stroke = 0.9,
-             fill = "white") +
+ggplot(cum, aes(received, share)) +
+  geom_step(linewidth = 0.8, colour = COL_BLUE) +
   geom_vline(xintercept = last_receipt, linetype = "dashed", colour = "grey55") +
   annotate("text", x = last_receipt, y = 0.05,
            label = paste0("last receipt: ", format(last_receipt, "%d %b %Y"), " "),
            hjust = 1, size = 3.2, colour = "grey30") +
   scale_y_continuous(labels = scales::label_percent(),
-                     limits = c(0, 0.4)) +
-  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y",
-               expand = expansion(mult = c(0.02, 0.18))) +
-  scale_colour_manual(values = c("Round 1" = COL_ORANGE, "Round 2" = COL_BLUE)) +
-  labs(x = NULL, y = "Share of round's kits returned", colour = NULL,
-       caption = paste0("Curves: the ", nrow(ret_dated), " returns with a lab receipt date, as a share of kits dispatched ",
-                        "(Round 1: ", tot_by_round$sent[1], ", Round 2: ", tot_by_round$sent[2], ").\n",
-                        "Open circles: total returned to date, including the ", n_undated,
-                        " returns without a receipt date (Round 1: ",
-                        sum(kitc$returned & kitc$round == 1) - sum(ret_dated$round == 1), ", Round 2: ",
-                        sum(kitc$returned & kitc$round == 2) - sum(ret_dated$round == 2), ").\n",
+                     limits = c(0, 0.35)) +
+  scale_x_date(date_breaks = "2 weeks", date_labels = "%d %b",
+               expand = expansion(mult = c(0.02, 0.08))) +
+  labs(x = NULL,
+       y = "Share of Round 2 kits returned",
+       caption = paste0("All ", nrow(r2_dated), " Round 2 returns carry a lab receipt date; share of the ",
+                        nrow(r2), " Round 2 kits dispatched.\n",
+                        "Round 1 is not shown: ",
+                        sum(r1$returned) - sum(r1$returned & !is.na(r1$date_received)),
+                        " of its ", sum(r1$returned), " returns (of ", nrow(r1),
+                        " kits) lack a receipt date, so its timing cannot be drawn.\n",
                         "Blood-results data through the 2026-06-22 lab export; later receipts, if any, are not yet in the data.")) +
   theme_minimal(base_size = 12) +
-  theme(legend.position = "bottom",
-        panel.grid.minor = element_blank(),
+  theme(panel.grid.minor = element_blank(),
         plot.caption = element_text(size = 8, colour = "grey40"))
 ```
 
