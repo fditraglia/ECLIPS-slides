@@ -998,9 +998,10 @@ lsoa_elig_tab <- addr |>
   count(lsoa, name = "letters") |>
   left_join(raw |> group_by(lsoa) |>
               summarise(started = n(), usable = sum(usable),
-                        elig = sum(eligible), .groups = "drop"),
+                        elig = sum(eligible),
+                        answered = sum(eligible | Finished), .groups = "drop"),
             by = "lsoa") |>
-  mutate(across(c(started, usable, elig), \(x) replace_na(x, 0L))) |>
+  mutate(across(c(started, usable, elig, answered), \(x) replace_na(x, 0L))) |>
   left_join(lsoa_ref |> transmute(lsoa = lsoa21cd,
                                   share = households_0_9 / total_households),
             by = "lsoa") |>
@@ -1045,6 +1046,75 @@ ggplot(lsoa_elig_tab, aes(share, rate)) +
         plot.caption = element_text(size = 8, colour = "grey40"))
 ```
 
+## A fresher eligibility map would not have helped
+
+```{r}
+#| label: elig-map-test
+#| fig-width: 8
+#| fig-height: 3.4
+# Does the near-flat gradient reflect a stale census map? Test: replace the
+# 2021 census household share with ONS mid-year child counts per frame
+# address (ECLIPS-PAP Script 29): children aged 0-5 at mid-2024 track the
+# eligible birth cohort ("best now"; first published 2025-11-07, three weeks
+# AFTER the design froze on 2025-10-14), children 0-3 at mid-2022 are the
+# newest vintage knowable at planning time. Each slope is shown as a % of its
+# own proportional benchmark (100% = usable responses scale one-for-one with
+# the measure; benchmark = overall rate / letter-weighted mean of the
+# measure). "Holding deprivation fixed" adds a cubic in imd_score.
+kids <- read_csv("~/ECLIPS-PAP/data/processed/lsoa-children-estimates.csv",
+                 show_col_types = FALSE)
+mt <- lsoa_elig_tab |>
+  left_join(kids, by = "lsoa") |>
+  left_join(lsoa_ref |> select(lsoa = lsoa21cd, n_addresses), by = "lsoa") |>
+  mutate(`Census 2021: households with young child` = share,
+         `Mid-2024 estimates: children 0-5 per address` = kids_0_5_mid2024 / n_addresses,
+         `Mid-2022 estimates: children 0-3 per address` = kids_0_3_mid2022 / n_addresses)
+MEASURES <- c("Census 2021: households with young child",
+              "Mid-2024 estimates: children 0-5 per address",
+              "Mid-2022 estimates: children 0-3 per address")
+
+fit_pct <- function(x, hold_imd) {
+  d <- mt |> mutate(x = x)
+  bench <- (sum(d$usable) / sum(d$letters)) * 1000 / weighted.mean(d$x, d$letters)
+  f <- if (hold_imd) rate ~ x + poly(imd_score, 3) else rate ~ x
+  m <- lm(f, data = d, weights = letters)
+  se <- sqrt(sandwich::vcovHC(m, type = "HC1")[2, 2])
+  tibble(pct = 100 * coef(m)[2] / bench,
+         lo  = 100 * (coef(m)[2] - 1.96 * se) / bench,
+         hi  = 100 * (coef(m)[2] + 1.96 * se) / bench)
+}
+slopes <- crossing(measure = MEASURES,
+                   spec = c("Raw", "Holding deprivation fixed")) |>
+  mutate(res = map2(measure, spec,
+                    \(mm, ss) fit_pct(mt[[mm]], ss == "Holding deprivation fixed"))) |>
+  unnest(res)
+
+slopes |>
+  mutate(measure = factor(measure, levels = rev(MEASURES)),
+         spec = factor(spec, levels = c("Raw", "Holding deprivation fixed"))) |>
+  ggplot(aes(pct, measure, colour = spec)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey55") +
+  geom_vline(xintercept = 100, linetype = "dotted", colour = "grey40") +
+  geom_errorbarh(aes(xmin = lo, xmax = hi), height = 0.18, linewidth = 0.7,
+                 position = position_dodge(width = 0.5)) +
+  geom_point(size = 2.6, position = position_dodge(width = 0.5)) +
+  annotate("text", x = 100, y = 0.55, label = "proportional ",
+           hjust = 1, size = 3, colour = "grey30") +
+  scale_colour_manual(values = c("Raw" = "grey45",
+                                 "Holding deprivation fixed" = COL_BLUE),
+                      name = NULL) +
+  labs(x = "Response-vs-eligibility slope, as % of proportional (95% CI)",
+       y = NULL,
+       caption = paste0("100% = usable responses scale one-for-one with the measure (benchmark: overall rate / letter-weighted mean); robust SEs.\n",
+                        "The mid-2024 measure targets the eligible birth cohort and correlates 0.85 with the census share; it predicts response no\n",
+                        "better, and in the most deprived quintile both slopes are ~0. The mid-2023/24 estimates were first published 2025-11-07,\n",
+                        "after the 2025-10-14 design freeze, so no fresher map existed at planning time. ONS mid-year estimates; ECLIPS-PAP Script 29.")) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom",
+        panel.grid.minor = element_blank(),
+        plot.caption = element_text(size = 8, colour = "grey40"))
+```
+
 ## Response per (census-)eligible household falls as the eligible share rises
 
 ```{r}
@@ -1068,7 +1138,8 @@ ggplot(lsoa_elig_tab, aes(share, per_elig)) +
        caption = sprintf(paste0("Denominator: census share x letters mailed; assumes Pr(eligible | mailed) equals the census share in each LSOA.\n",
                         "Dot area = estimated eligible mailings; %d dots above 100 are outside the plot area but in the fit.\n",
                         "Line: WLS (eligible-mailing weights); slope %.0f per 1,000 per +10 pp (robust SE %.0f).\n",
-                        "No adjustment for flagged non-household buildings (building-evidence.csv), which inflate a few LSOAs' letter counts."),
+                        "No adjustment for flagged non-household buildings (building-evidence.csv), which inflate a few LSOAs' letter counts.\n",
+                        "Arithmetic companion to the raw-rate slide: dividing its nearly flat rate by the rising share yields this decline by construction."),
                         sum(lsoa_elig_tab$per_elig > 100),
                         coef(m_pere)[2] / 10, se_pere / 10)) +
   theme_minimal(base_size = 12) +
@@ -1077,43 +1148,46 @@ ggplot(lsoa_elig_tab, aes(share, per_elig)) +
         plot.caption = element_text(size = 8, colour = "grey40"))
 ```
 
-## Responders report an eligible child at $\approx$ 78% wherever they live
+## Those who answer the eligibility question say yes $\approx$ 92% of the time, everywhere
 
 ```{r}
 #| label: elig-vs-census
 #| fig-width: 8
 #| fig-height: 3.5
-# Item 2b: the survey observes eligibility among responders; compare the share
-# of started responses reporting an eligible child with the census eligible
-# share, per LSOA. Faint dots: LSOAs with >= 1 started response. Blue points:
-# LSOAs grouped into deciles by census share (weighted by started responses),
-# with Wilson CIs. The comparison conditions on having responded --- eligible
-# households respond at higher rates, so the level is far above the census
-# share mechanically; the informative part is the (near-absent) gradient.
-l2b <- lsoa_elig_tab |> filter(started > 0)
+# Item 2b, recut 2026-07-12: denominator = starters who ANSWERED the
+# eligibility question (reported an eligible child -> `eligible`, or reported
+# none and were screened out -> Finished & !eligible). The first version used
+# all started responses, which mixed "answered no" with "left before the
+# question" -- and early leaving rises with deprivation, so its gradient
+# partly reflected drop-off (see the drop-off slides), not composition.
+# Conditions on responding: eligible households respond at far higher rates,
+# so the level sits far above the census share by construction; the
+# informative part is the (near-absent) gradient.
+l2b <- lsoa_elig_tab |> filter(answered > 0)
 bins_2b <- l2b |>
   arrange(share) |>
-  mutate(b = ntile(cumsum(started), 10)) |>
+  mutate(b = ntile(cumsum(answered), 10)) |>
   group_by(b) |>
-  summarise(share = weighted.mean(share, started),
-            elig = sum(elig), started = sum(started), .groups = "drop") |>
-  add_score_ci(elig, started, scale = 100)
+  summarise(share = weighted.mean(share, answered),
+            elig = sum(elig), answered = sum(answered), .groups = "drop") |>
+  add_score_ci(elig, answered, scale = 100)
 
 ggplot(bins_2b, aes(share, est)) +
-  geom_point(data = l2b, aes(share, 100 * elig / started, size = started),
+  geom_point(data = l2b, aes(share, 100 * elig / answered, size = answered),
              colour = "grey75", alpha = 0.6, inherit.aes = FALSE) +
-  geom_hline(yintercept = 100 * sum(l2b$elig) / sum(l2b$started),
+  geom_hline(yintercept = 100 * sum(l2b$elig) / sum(l2b$answered),
              linetype = "dashed", colour = "grey55") +
   geom_pointrange(aes(ymin = lo, ymax = hi), colour = COL_BLUE, size = 0.45) +
   scale_size_area(max_size = 3.5, guide = "none") +
   scale_x_continuous(labels = scales::label_percent(accuracy = 1)) +
   scale_y_continuous(limits = c(0, 100)) +
   labs(x = "Census share of households with a young child (LSOA)",
-       y = "% reporting an eligible child",
-       caption = paste0("Blue: LSOAs binned into deciles by census share (weighted by started responses), with 95% Wilson intervals;\n",
-                        "grey dots: individual LSOAs (area = started responses); dashed line: overall 78%.\n",
-                        "Conditions on having responded: eligible households respond at higher rates, so the level exceeds the census share\n",
-                        "by construction; the census share barely predicts responder eligibility.")) +
+       y = "% answering yes",
+       caption = paste0("Answered = reported an eligible child (1,269) or reported none and was screened out (107); the 246 who left before\n",
+                        "the question are excluded (their share rises with deprivation --- see the drop-off slides).\n",
+                        "Blue: deciles by census share (weighted by answers), 95% Wilson intervals; grey: LSOAs (area = answers); dashed: overall 92%.\n",
+                        "Conditions on responding: eligible households respond at far higher rates, so the level is high by construction;\n",
+                        "the census share barely predicts the eligibility of those who answer.")) +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank(),
         plot.caption = element_text(size = 8, colour = "grey40"))
