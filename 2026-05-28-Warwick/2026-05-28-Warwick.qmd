@@ -653,7 +653,7 @@ ggplot(age_tab, aes(x = est, y = age_grp, colour = treatment)) +
 
 
 
-## Treatment affects *starting* the survey. \hfill \small \alert{(Preliminary)}
+## Treatment affects *starting* the survey.
 
 
 ```{r}
@@ -667,7 +667,7 @@ cell_table |>
 ```
 
 
-## Treatment effects: starting vs. usable response \hfill \small \alert{(Preliminary)}
+## Treatment effects: starting vs. usable response
 
 ```{r}
 #| label: treatment-diff-forest
@@ -1503,7 +1503,7 @@ lsoa_map(eb_lsoa, "post", "Usable\nper 1,000")
 
 \small Posterior means --- *own scale (`r round(min(eb_lsoa$post))`--`r round(max(eb_lsoa$post))`) and a different palette*. Far narrower range: most LSOAs pulled to the Leeds average.
 
-## Clicking: deprivation gradient by housing age \hfill \small \alert{(Preliminary)}
+## Clicking: deprivation gradient by housing age
 
 \hypertarget{appx-click-age}{}
 
@@ -1518,7 +1518,7 @@ imd_summary(imd_cells, "age_grp", outcome = "clicks") |>
   gradient_plot("age_grp", AGE_COLS, "Clicks per 1,000")
 ```
 
-## Clicking: does the gradient differ by treatment? (Old) \hfill \small \alert{(Preliminary)}
+## Clicking: does the gradient differ by treatment? (Old)
 
 \hypertarget{appx-click-treat}{}
 
